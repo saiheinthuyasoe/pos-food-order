@@ -1,0 +1,101 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function hasRole(role) {
+      return isAdmin() &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == role;
+    }
+
+    function isSuperAdmin() {
+      return hasRole('super_admin');
+    }
+
+    // ── Customers (users) ───────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read, write: if request.auth.uid == userId;
+      // Admins can read any customer doc (for Customers management page)
+      allow read: if isAdmin();
+    }
+
+    // ── Menu items — public read, admin write ──────────────────────────────────
+    match /menu_items/{itemId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // ── Categories — public read, admin write ─────────────────────────────────
+    match /categories/{catId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // ── Orders ─────────────────────────────────────────────────────────────────
+    match /orders/{orderId} {
+      // Customers can create and read their own orders
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() &&
+        (resource.data.customerId == request.auth.uid || isAdmin());
+      // Status updates by admin or delivery/kitchen staff
+      allow update: if isAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── Tables ─────────────────────────────────────────────────────────────────
+    match /tables/{tableId} {
+      // Customers need to read free tables for the checkout walk-in dropdown
+      allow read: if isSignedIn();
+      // Customers update table status (occupied) when placing a walk-in order;
+      // admins cycle status on the tables management page.
+      allow update: if isSignedIn();
+      // Only super_admin can add or remove tables
+      allow create, delete: if isSuperAdmin();
+    }
+
+    // ── Staff (admins collection) ──────────────────────────────────────────────
+    match /admins/{adminId} {
+      // Any authenticated admin can read all admin docs.
+      // Needed for: delivery page listing delivery staff, staff management page,
+      // and AuthContext reading own role doc on login.
+      allow read: if isAdmin() || request.auth.uid == adminId;
+      // Only super_admin can create/update/delete staff
+      allow write: if isSuperAdmin();
+    }
+
+    // ── Settings ───────────────────────────────────────────────────────────────
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // ── Promo codes ────────────────────────────────────────────────────────────
+    match /promo_codes/{codeId} {
+      allow read: if isSignedIn();
+      // Customers update usageCount when applying a promo at checkout
+      allow update: if isSignedIn();
+      // Only super_admin can create or delete promo codes
+      allow create, delete: if isSuperAdmin();
+    }
+
+    // ── Notifications ──────────────────────────────────────────────────────────
+    match /notifications/{notifId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // On create, resource is null — must use request.resource.
+      // Admins also create notifications when updating order status.
+      allow create: if isSignedIn() &&
+        (request.resource.data.userId == request.auth.uid || isAdmin());
+      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+  }
+}
