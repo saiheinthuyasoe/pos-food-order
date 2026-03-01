@@ -18,6 +18,7 @@ import {
   Settings,
   LogOut,
   X,
+  Wallet,
 } from "lucide-react";
 
 import { AdminRole } from "@/contexts/AuthContext";
@@ -40,7 +41,7 @@ const NAV_ITEMS: NavItem[] = [
     href: "/admin/orders",
     label: "Orders",
     icon: ClipboardList,
-    roles: ["super_admin", "kitchen", "delivery"],
+    roles: ["super_admin", "kitchen", "delivery", "cashier"],
   },
   {
     href: "/admin/menu",
@@ -89,6 +90,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Payments",
     icon: CreditCard,
     roles: ["super_admin"],
+  },
+  {
+    href: "/admin/cashier",
+    label: "Cashier",
+    icon: Wallet,
+    roles: ["super_admin", "cashier"],
   },
   {
     href: "/admin/reports",

@@ -24,7 +24,12 @@ function deleteCookie(name: string) {
   document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
 }
 
-export type AdminRole = "super_admin" | "kitchen" | "delivery" | null;
+export type AdminRole =
+  | "super_admin"
+  | "kitchen"
+  | "delivery"
+  | "cashier"
+  | null;
 
 interface AuthContextValue {
   user: User | null;

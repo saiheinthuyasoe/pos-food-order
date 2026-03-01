@@ -68,7 +68,7 @@ export interface RestaurantTable {
 }
 
 // ─── Staff ────────────────────────────────────────────────────────────────
-export type StaffRole = "super_admin" | "kitchen" | "delivery";
+export type StaffRole = "super_admin" | "kitchen" | "delivery" | "cashier";
 
 export interface StaffMember {
   id: string;
@@ -138,6 +138,7 @@ export interface Order {
   statusHistory: StatusHistoryEntry[];
   createdAt: Timestamp;
   estimatedReadyAt?: Timestamp;
+  paidAt?: Timestamp;
 }
 
 // ─── Promo Code ───────────────────────────────────────────────────────────

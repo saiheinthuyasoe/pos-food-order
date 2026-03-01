@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   doc,
+  getDoc,
   onSnapshot,
   updateDoc,
   arrayUnion,
@@ -17,9 +18,10 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Order, OrderStatus } from "@/types";
-import { ArrowLeft, CheckCircle, Clock } from "lucide-react";
+import { Order, OrderStatus, RestaurantSettings } from "@/types";
+import { ArrowLeft, CheckCircle, Clock, Printer } from "lucide-react";
 import { STATUS_COLORS } from "../page";
+import { printReceipt } from "@/lib/printReceipt";
 
 const NEXT_STATUS: Partial<
   Record<OrderStatus, { walkin: OrderStatus; delivery: OrderStatus }>
@@ -42,10 +44,14 @@ const ACTION_LABELS: Partial<Record<OrderStatus, string>> = {
 export default function OrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>();
   const [order, setOrder] = useState<Order | null>(null);
+  const [settings, setSettings] = useState<RestaurantSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
+    getDoc(doc(db, "settings", "restaurant")).then((snap) => {
+      if (snap.exists()) setSettings(snap.data() as RestaurantSettings);
+    });
     return onSnapshot(doc(db, "orders", orderId), (snap) => {
       if (snap.exists()) setOrder({ id: snap.id, ...snap.data() } as Order);
       setLoading(false);
@@ -100,7 +106,31 @@ export default function OrderDetailPage() {
         /* ignore */
       });
     }
+    // Auto-print receipt when confirming a walk-in order.
+    // NOTE: Tax is $0 on the order at this stage (calculated by cashier at payment).
+    // This print is for the kitchen/staff copy only — the customer receipt with
+    // tax is printed by the cashier when collecting payment.
+    if (newStatus === "confirmed" && order.orderType === "walkin") {
+      // Use the fresh order state that Firestore will push back, but we already
+      // have the data — construct a receipt-ready copy with updated status.
+      const receiptOrder: Order = { ...order, status: newStatus };
+      printReceipt(receiptOrder, {
+        restaurantName: settings?.name ?? "FoodOrder",
+        address: settings?.address,
+        phone: settings?.phone,
+      });
+    }
+
     setUpdating(false);
+  };
+
+  const handlePrint = () => {
+    if (!order) return;
+    printReceipt(order, {
+      restaurantName: settings?.name ?? "FoodOrder",
+      address: settings?.address,
+      phone: settings?.phone,
+    });
   };
 
   const cancelOrder = async () => {
@@ -131,11 +161,23 @@ export default function OrderDetailPage() {
             {order.createdAt?.toDate().toLocaleString()}
           </p>
         </div>
-        <span
-          className={`ml-auto rounded-full px-3 py-1 text-sm font-medium capitalize ${STATUS_COLORS[order.status]}`}
-        >
-          {order.status.replace("_", " ")}
-        </span>
+        <div className="ml-auto flex items-center gap-3">
+          {/* Print button — available once order is confirmed or beyond */}
+          {order.orderType === "walkin" &&
+            !["pending", "cancelled"].includes(order.status) && (
+              <button
+                onClick={handlePrint}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <Printer className="w-3.5 h-3.5" /> Print Receipt
+              </button>
+            )}
+          <span
+            className={`rounded-full px-3 py-1 text-sm font-medium capitalize ${STATUS_COLORS[order.status]}`}
+          >
+            {order.status.replace("_", " ")}
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -228,10 +270,14 @@ export default function OrderDetailPage() {
               )}
               <div className="flex justify-between text-gray-500">
                 <span>Tax</span>
-                <span>${order.tax.toFixed(2)}</span>
+                {order.orderType === "walkin" && order.paymentStatus !== "paid" ? (
+                  <span className="text-xs italic text-gray-400">calculated at cashier</span>
+                ) : (
+                  <span>${order.tax.toFixed(2)}</span>
+                )}
               </div>
               <div className="flex justify-between font-bold text-gray-800 pt-1 border-t border-gray-100">
-                <span>Total</span>
+                <span>Total{order.orderType === "walkin" && order.paymentStatus !== "paid" ? " (before tax)" : ""}</span>
                 <span>${order.total.toFixed(2)}</span>
               </div>
             </div>

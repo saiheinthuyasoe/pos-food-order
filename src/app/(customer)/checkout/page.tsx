@@ -19,7 +19,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { RestaurantSettings, PromoCode, RestaurantTable } from "@/types";
-import { CreditCard, Banknote, AlertCircle, QrCode } from "lucide-react";
+import { Banknote, AlertCircle, QrCode, Wallet } from "lucide-react";
 
 type OrderTab = "walkin" | "delivery";
 type PayMethod = "cash" | "card" | "scan";
@@ -78,10 +78,12 @@ export default function CheckoutPage() {
       ? (subtotal * promo.discountAmount) / 100
       : promo.discountAmount
     : 0;
+  // Walk-in tax is collected by the cashier at payment time, not at order placement
   const taxRate = (settings?.taxRate ?? 0) / 100;
   const taxableAmount = subtotal - discount + deliveryFee;
-  const tax = taxableAmount * taxRate;
-  const total = taxableAmount + tax;
+  // For walk-in: tax is $0 at order time; cashier calculates it at payment
+  const displayTax = tab === "walkin" ? 0 : taxableAmount * taxRate;
+  const displayTotal = tab === "walkin" ? taxableAmount : taxableAmount + displayTax;
 
   const setField = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -131,11 +133,12 @@ export default function CheckoutPage() {
         discount,
         ...(promo ? { promoCode: promo.code } : {}),
         deliveryFee,
-        tax: parseFloat(tax.toFixed(2)),
-        total: parseFloat(total.toFixed(2)),
+        // Walk-in: tax is $0 now; cashier will update tax+total when collecting payment
+        tax: tab === "walkin" ? 0 : parseFloat(displayTax.toFixed(2)),
+        total: parseFloat(displayTotal.toFixed(2)),
         status: "pending",
-        paymentMethod: payMethod,
-        paymentStatus: payMethod === "cash" ? "pending" : "pending",
+        paymentMethod: tab === "walkin" ? "cash" : payMethod,
+        paymentStatus: "pending",
         ...(tab === "walkin"
           ? { tableNumber: parseInt(form.tableNumber) }
           : {}),
@@ -206,10 +209,10 @@ export default function CheckoutPage() {
             subtotal,
             discount,
             deliveryFee,
-            tax: parseFloat(tax.toFixed(2)),
-            total: parseFloat(total.toFixed(2)),
+            tax: parseFloat(displayTax.toFixed(2)),
+            total: parseFloat(displayTotal.toFixed(2)),
             ...(promo ? { promoCode: promo.code } : {}),
-            paymentMethod: payMethod,
+            paymentMethod: tab === "walkin" ? "cash" : payMethod,
             estimatedTime:
               tab === "walkin"
                 ? "Ready in ~20 minutes"
@@ -375,79 +378,84 @@ export default function CheckoutPage() {
             )}
           </div>
 
-          {/* Payment */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm">
-            <h2 className="font-semibold text-gray-700 mb-4">Payment Method</h2>
-            <div className="grid grid-cols-3 gap-3">
-              <button
-                onClick={() => setPayMethod("cash")}
-                className={`flex items-center gap-3 p-4 border-2 rounded-xl transition-all ${
-                  payMethod === "cash"
-                    ? "border-amber-500 bg-amber-50"
-                    : "border-gray-200"
-                }`}
-              >
-                <Banknote
-                  className={`w-5 h-5 ${payMethod === "cash" ? "text-amber-600" : "text-gray-400"}`}
-                />
-                <div className="text-left">
-                  <p
-                    className={`font-medium text-sm ${payMethod === "cash" ? "text-amber-700" : "text-gray-700"}`}
-                  >
-                    Cash
-                  </p>
-                  <p className="text-xs text-gray-400">Pay on arrival</p>
-                </div>
-              </button>
-              <button
-                onClick={() => setPayMethod("scan")}
-                className={`flex items-center gap-3 p-4 border-2 rounded-xl transition-all ${
-                  payMethod === "scan"
-                    ? "border-amber-500 bg-amber-50"
-                    : "border-gray-200"
-                }`}
-              >
-                <QrCode
-                  className={`w-5 h-5 ${payMethod === "scan" ? "text-amber-600" : "text-gray-400"}`}
-                />
-                <div className="text-left">
-                  <p
-                    className={`font-medium text-sm ${payMethod === "scan" ? "text-amber-700" : "text-gray-700"}`}
-                  >
-                    Scan QR
-                  </p>
-                  <p className="text-xs text-gray-400">Scan &amp; pay</p>
-                </div>
-              </button>
-              <button
-                onClick={() => setPayMethod("card")}
-                className={`flex items-center gap-3 p-4 border-2 rounded-xl transition-all ${
-                  payMethod === "card"
-                    ? "border-amber-500 bg-amber-50"
-                    : "border-gray-200"
-                }`}
-              >
-                <CreditCard
-                  className={`w-5 h-5 ${payMethod === "card" ? "text-amber-600" : "text-gray-400"}`}
-                />
-                <div className="text-left">
-                  <p
-                    className={`font-medium text-sm ${payMethod === "card" ? "text-amber-700" : "text-gray-700"}`}
-                  >
-                    Card
-                  </p>
-                  <p className="text-xs text-gray-400">Stripe · coming soon</p>
-                </div>
-              </button>
-            </div>
-            {payMethod === "card" && (
-              <div className="mt-3 p-3 bg-amber-50 rounded-lg text-xs text-amber-700 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                Card payment requires Stripe configuration. Please select Cash
-                or Scan QR for now.
+          {/* Payment — only for delivery; walk-in is handled by cashier */}
+          {tab === "delivery" ? (
+            <div className="bg-white rounded-2xl p-5 shadow-sm">
+              <h2 className="font-semibold text-gray-700 mb-4">
+                Payment Method
+              </h2>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setPayMethod("cash")}
+                  className={`flex items-center gap-3 p-4 border-2 rounded-xl transition-all ${
+                    payMethod === "cash"
+                      ? "border-amber-500 bg-amber-50"
+                      : "border-gray-200"
+                  }`}
+                >
+                  <Banknote
+                    className={`w-5 h-5 ${
+                      payMethod === "cash" ? "text-amber-600" : "text-gray-400"
+                    }`}
+                  />
+                  <div className="text-left">
+                    <p
+                      className={`font-medium text-sm ${
+                        payMethod === "cash"
+                          ? "text-amber-700"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      Cash
+                    </p>
+                    <p className="text-xs text-gray-400">Pay on delivery</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setPayMethod("scan")}
+                  className={`flex items-center gap-3 p-4 border-2 rounded-xl transition-all ${
+                    payMethod === "scan"
+                      ? "border-amber-500 bg-amber-50"
+                      : "border-gray-200"
+                  }`}
+                >
+                  <QrCode
+                    className={`w-5 h-5 ${
+                      payMethod === "scan" ? "text-amber-600" : "text-gray-400"
+                    }`}
+                  />
+                  <div className="text-left">
+                    <p
+                      className={`font-medium text-sm ${
+                        payMethod === "scan"
+                          ? "text-amber-700"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      Scan QR
+                    </p>
+                    <p className="text-xs text-gray-400">Scan &amp; pay</p>
+                  </div>
+                </button>
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl p-5 shadow-sm">
+              <h2 className="font-semibold text-gray-700 mb-3">Payment</h2>
+              <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                <Wallet className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800">
+                    Payment at the counter
+                  </p>
+                  <p className="text-xs text-amber-600 mt-0.5">
+                    Our cashier will collect your payment (cash, card, or QR
+                    scan) when your order is ready.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right: summary */}
@@ -486,13 +494,20 @@ export default function CheckoutPage() {
                   <span>${deliveryFee.toFixed(2)}</span>
                 </div>
               )}
-              <div className="flex justify-between text-gray-500">
-                <span>Tax ({settings?.taxRate ?? 0}%)</span>
-                <span>${tax.toFixed(2)}</span>
-              </div>
+              {tab === "walkin" ? (
+                <div className="flex justify-between text-gray-400 text-xs italic">
+                  <span>Tax ({settings?.taxRate ?? 0}%)</span>
+                  <span>calculated at counter</span>
+                </div>
+              ) : (
+                <div className="flex justify-between text-gray-500">
+                  <span>Tax ({settings?.taxRate ?? 0}%)</span>
+                  <span>${displayTax.toFixed(2)}</span>
+                </div>
+              )}
               <div className="border-t border-gray-100 pt-2 flex justify-between font-bold text-gray-800 text-base">
-                <span>Total</span>
-                <span>${total.toFixed(2)}</span>
+                <span>Total{tab === "walkin" ? " (before tax)" : ""}</span>
+                <span>${displayTotal.toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -505,7 +520,7 @@ export default function CheckoutPage() {
 
           <button
             onClick={handlePlaceOrder}
-            disabled={placing || payMethod === "card"}
+            disabled={placing || (tab === "delivery" && payMethod === "card")}
             className="w-full py-3.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl disabled:opacity-50 text-sm"
           >
             {placing ? "Placing Order…" : "Place Order"}

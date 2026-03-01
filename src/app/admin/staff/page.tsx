@@ -17,12 +17,14 @@ const ROLE_LABELS: Record<StaffRole, string> = {
   super_admin: "Super Admin",
   kitchen: "Kitchen",
   delivery: "Delivery",
+  cashier: "Cashier",
 };
 
 const ROLE_COLORS: Record<StaffRole, string> = {
   super_admin: "bg-purple-100 text-purple-700",
   kitchen: "bg-orange-100 text-orange-700",
   delivery: "bg-blue-100 text-blue-700",
+  cashier: "bg-green-100 text-green-700",
 };
 
 export default function StaffPage() {
@@ -171,6 +173,7 @@ export default function StaffPage() {
                 <option value="super_admin">Super Admin</option>
                 <option value="kitchen">Kitchen</option>
                 <option value="delivery">Delivery</option>
+                <option value="cashier">Cashier</option>
               </select>
               <div className="flex gap-3 pt-2">
                 <button

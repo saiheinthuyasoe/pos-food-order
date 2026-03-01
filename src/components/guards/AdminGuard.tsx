@@ -8,6 +8,13 @@ import { useAuth } from "@/contexts/AuthContext";
 const ROLE_ALLOWED_PREFIXES: Record<string, string[]> = {
   kitchen: ["/admin/dashboard", "/admin/orders"],
   delivery: ["/admin/dashboard", "/admin/orders", "/admin/delivery"],
+  cashier: ["/admin/cashier", "/admin/orders"],
+};
+
+const ROLE_DEFAULT_ROUTE: Record<string, string> = {
+  kitchen: "/admin/orders",
+  delivery: "/admin/orders",
+  cashier: "/admin/cashier",
 };
 
 function isAllowed(pathname: string, prefixes: string[]): boolean {
@@ -41,7 +48,7 @@ export default function AdminGuard({
     if (adminRole && adminRole !== "super_admin") {
       const allowed = ROLE_ALLOWED_PREFIXES[adminRole] ?? [];
       if (!isAllowed(pathname, allowed)) {
-        router.replace("/admin/orders");
+        router.replace(ROLE_DEFAULT_ROUTE[adminRole] ?? "/admin/orders");
       }
     }
   }, [user, isAdmin, adminRole, loading, pathname, router]);
