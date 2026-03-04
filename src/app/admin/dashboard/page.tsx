@@ -11,6 +11,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { Order } from "@/types";
 import {
   BarChart,
@@ -25,6 +26,7 @@ import {
 } from "recharts";
 
 export default function AdminDashboardPage() {
+  const { fmt } = useCurrency();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -92,7 +94,7 @@ export default function AdminDashboardPage() {
         />
         <KpiCard
           label="Today's Revenue"
-          value={loading ? "…" : `$${todayRevenue.toFixed(2)}`}
+          value={loading ? "…" : fmt(todayRevenue)}
           sub="paid orders"
           color="green"
           href="/admin/payments"

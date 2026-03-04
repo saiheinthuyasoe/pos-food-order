@@ -7,6 +7,7 @@ import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Category, MenuItem, MenuItemOptionGroup } from "@/types";
 import { useCart } from "@/contexts/CartContext";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { Search, ShoppingCart, X, Plus, Minus } from "lucide-react";
 
 // ─── Food Detail Modal ──────────────────────────────────────────────────────
@@ -20,6 +21,7 @@ interface ModalProps {
   ) => void;
 }
 function FoodDetailModal({ item, onClose, onAdd }: ModalProps) {
+  const { fmt } = useCurrency();
   const [qty, setQty] = useState(1);
   const [selected, setSelected] = useState<Record<string, string | string[]>>(
     {},
@@ -99,6 +101,7 @@ function FoodDetailModal({ item, onClose, onAdd }: ModalProps) {
             )}
           </div>
           <button
+            title="Close"
             onClick={onClose}
             className="absolute top-3 right-3 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center shadow"
           >
@@ -109,7 +112,7 @@ function FoodDetailModal({ item, onClose, onAdd }: ModalProps) {
           <div className="flex items-start justify-between gap-2 mb-2">
             <h2 className="text-xl font-bold text-gray-800">{item.name}</h2>
             <span className="text-lg font-bold text-amber-600">
-              ${item.price.toFixed(2)}
+              {fmt(item.price)}
             </span>
           </div>
           {item.dietaryTags?.length > 0 && (
@@ -152,7 +155,7 @@ function FoodDetailModal({ item, onClose, onAdd }: ModalProps) {
                     {opt.name}
                     {opt.extraCost > 0 && (
                       <span className="text-xs ml-1 opacity-70">
-                        +${opt.extraCost.toFixed(2)}
+                        +{fmt(opt.extraCost)}
                       </span>
                     )}
                   </button>
@@ -165,6 +168,7 @@ function FoodDetailModal({ item, onClose, onAdd }: ModalProps) {
           <div className="flex items-center gap-4 mt-4">
             <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
               <button
+                title="setQuantity"
                 onClick={() => setQty(Math.max(1, qty - 1))}
                 className="px-3 py-2 hover:bg-gray-50"
               >
@@ -172,6 +176,7 @@ function FoodDetailModal({ item, onClose, onAdd }: ModalProps) {
               </button>
               <span className="px-4 font-semibold">{qty}</span>
               <button
+                title="setQuantity"
                 onClick={() => setQty(qty + 1)}
                 className="px-3 py-2 hover:bg-gray-50"
               >
@@ -179,6 +184,7 @@ function FoodDetailModal({ item, onClose, onAdd }: ModalProps) {
               </button>
             </div>
             <button
+              title="Add to Cart"
               onClick={handleAdd}
               disabled={requiredMissing > 0 || added}
               className={`flex-1 py-2.5 rounded-xl font-medium text-sm transition-all ${
@@ -189,7 +195,7 @@ function FoodDetailModal({ item, onClose, onAdd }: ModalProps) {
                     : "bg-amber-500 hover:bg-amber-600 text-white"
               }`}
             >
-              {added ? "✓ Added!" : `Add to Cart — $${total.toFixed(2)}`}
+              {added ? "✓ Added!" : `Add to Cart — ${fmt(total)}`}
             </button>
           </div>
           {requiredMissing > 0 && (
@@ -211,6 +217,7 @@ export default function MenuPage() {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [selected, setSelected] = useState<MenuItem | null>(null);
   const { addItem, totalItems } = useCart();
+  const { fmt } = useCurrency();
   const [addedKeys, setAddedKeys] = useState<Set<string>>(new Set());
   const topRef = useRef<HTMLDivElement>(null);
 
@@ -305,6 +312,7 @@ export default function MenuPage() {
         />
         {search && (
           <button
+            title="Clear search"
             onClick={() => setSearch("")}
             className="absolute right-3 top-2.5"
           >
@@ -384,7 +392,7 @@ export default function MenuPage() {
                 </div>
                 <div className="flex items-center justify-between mt-2">
                   <p className="font-bold text-amber-600 text-sm">
-                    ${item.price.toFixed(2)}
+                    {fmt(item.price)}
                   </p>
                   {item.optionGroups?.length > 0 ? (
                     <button

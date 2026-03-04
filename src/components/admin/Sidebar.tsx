@@ -19,6 +19,8 @@ import {
   LogOut,
   X,
   Wallet,
+  Receipt,
+  FileBarChart2,
 } from "lucide-react";
 
 import { AdminRole } from "@/contexts/AuthContext";
@@ -44,6 +46,12 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["super_admin", "kitchen", "delivery", "cashier"],
   },
   {
+    href: "/admin/delivery",
+    label: "Delivery",
+    icon: Truck,
+    roles: ["super_admin", "delivery"],
+  },
+  {
     href: "/admin/menu",
     label: "Menu",
     icon: UtensilsCrossed,
@@ -55,6 +63,41 @@ const NAV_ITEMS: NavItem[] = [
     icon: Tag,
     roles: ["super_admin"],
   },
+  
+  
+  {
+    href: "/admin/cashier",
+    label: "Cashier",
+    icon: Wallet,
+    roles: ["super_admin", "cashier", "delivery"],
+  },
+  
+  
+  {
+    href: "/admin/payments",
+    label: "Payments",
+    icon: CreditCard,
+    roles: ["super_admin"],
+  },
+  
+  {
+    href: "/admin/expenses",
+    label: "Expenses",
+    icon: Receipt,
+    roles: ["super_admin"],
+  },
+  {
+    href: "/admin/transactions",
+    label: "Transactions",
+    icon: FileBarChart2,
+    roles: ["super_admin"],
+  },
+  {
+    href: "/admin/reports",
+    label: "Reports",
+    icon: BarChart3,
+    roles: ["super_admin"],
+  },
   {
     href: "/admin/tables",
     label: "Tables",
@@ -62,17 +105,12 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["super_admin"],
   },
   {
-    href: "/admin/delivery",
-    label: "Delivery",
-    icon: Truck,
-    roles: ["super_admin", "delivery"],
-  },
-  {
     href: "/admin/staff",
     label: "Staff",
     icon: Users,
     roles: ["super_admin"],
   },
+  
   {
     href: "/admin/customers",
     label: "Customers",
@@ -83,24 +121,6 @@ const NAV_ITEMS: NavItem[] = [
     href: "/admin/promo-codes",
     label: "Promo Codes",
     icon: Tags,
-    roles: ["super_admin"],
-  },
-  {
-    href: "/admin/payments",
-    label: "Payments",
-    icon: CreditCard,
-    roles: ["super_admin"],
-  },
-  {
-    href: "/admin/cashier",
-    label: "Cashier",
-    icon: Wallet,
-    roles: ["super_admin", "cashier"],
-  },
-  {
-    href: "/admin/reports",
-    label: "Reports",
-    icon: BarChart3,
     roles: ["super_admin"],
   },
   {

@@ -6,7 +6,7 @@ import { sendPasswordResetEmail } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Customer, SavedAddress } from "@/types";
-import { Plus, Trash2, MapPin, Check } from "lucide-react";
+import { Plus, Trash2, MapPin, Check, ExternalLink } from "lucide-react";
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -17,7 +17,12 @@ export default function ProfilePage() {
   const [resetSent, setResetSent] = useState(false);
 
   // Address form
-  const [newAddr, setNewAddr] = useState({ label: "Home", address: "" });
+  const [newAddr, setNewAddr] = useState({
+    label: "Home",
+    address: "",
+    apartment: "",
+    mapsUrl: "",
+  });
   const [addingAddr, setAddingAddr] = useState(false);
 
   useEffect(() => {
@@ -66,6 +71,8 @@ export default function ProfilePage() {
       id: crypto.randomUUID(),
       label: newAddr.label,
       address: newAddr.address,
+      ...(newAddr.apartment ? { apartment: newAddr.apartment } : {}),
+      ...(newAddr.mapsUrl ? { mapsUrl: newAddr.mapsUrl } : {}),
       isDefault: (customer?.savedAddresses ?? []).length === 0,
     };
     const updated = [...(customer?.savedAddresses ?? []), addr];
@@ -75,7 +82,7 @@ export default function ProfilePage() {
       { merge: true },
     );
     setCustomer((prev) => (prev ? { ...prev, savedAddresses: updated } : null));
-    setNewAddr({ label: "Home", address: "" });
+    setNewAddr({ label: "Home", address: "", apartment: "", mapsUrl: "" });
     setAddingAddr(false);
   };
 
@@ -129,6 +136,7 @@ export default function ProfilePage() {
               Full Name
             </label>
             <input
+              title="Name"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
@@ -139,6 +147,7 @@ export default function ProfilePage() {
               Phone
             </label>
             <input
+              title="Phone"
               value={form.phone}
               onChange={(e) =>
                 setForm((f) => ({ ...f, phone: e.target.value }))
@@ -152,6 +161,7 @@ export default function ProfilePage() {
               Email
             </label>
             <input
+              title="Email"
               value={user?.email ?? ""}
               disabled
               className="w-full border border-gray-100 bg-gray-50 rounded-xl px-3 py-2 text-sm text-gray-400"
@@ -209,6 +219,7 @@ export default function ProfilePage() {
                   Label
                 </label>
                 <select
+                  title="New Address"
                   value={newAddr.label}
                   onChange={(e) =>
                     setNewAddr((n) => ({ ...n, label: e.target.value }))
@@ -222,7 +233,7 @@ export default function ProfilePage() {
               </div>
               <div className="flex-[3]">
                 <label className="text-xs text-gray-500 block mb-1">
-                  Full Address
+                  Full Address *
                 </label>
                 <input
                   value={newAddr.address}
@@ -230,6 +241,34 @@ export default function ProfilePage() {
                     setNewAddr((n) => ({ ...n, address: e.target.value }))
                   }
                   placeholder="123 Main St, City"
+                  className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-amber-400"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">
+                  Apartment / Floor
+                </label>
+                <input
+                  value={newAddr.apartment}
+                  onChange={(e) =>
+                    setNewAddr((n) => ({ ...n, apartment: e.target.value }))
+                  }
+                  placeholder="Apt 4B, Floor 2"
+                  className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-amber-400"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1 flex items-center gap-1">
+                  Google Maps Link
+                </label>
+                <input
+                  value={newAddr.mapsUrl}
+                  onChange={(e) =>
+                    setNewAddr((n) => ({ ...n, mapsUrl: e.target.value }))
+                  }
+                  placeholder="https://maps.google.com/..."
                   className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-amber-400"
                 />
               </div>
@@ -259,35 +298,59 @@ export default function ProfilePage() {
             {customer!.savedAddresses.map((addr) => (
               <div
                 key={addr.id}
-                className={`flex items-center gap-3 p-3 rounded-xl border ${addr.isDefault ? "border-amber-200 bg-amber-50" : "border-gray-100"}`}
+                className={`p-3 rounded-xl border ${
+                  addr.isDefault
+                    ? "border-amber-200 bg-amber-50"
+                    : "border-gray-100"
+                }`}
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-gray-700">
-                      {addr.label}
-                    </span>
-                    {addr.isDefault && (
-                      <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">
-                        Default
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-medium text-gray-700">
+                        {addr.label}
                       </span>
+                      {addr.isDefault && (
+                        <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">
+                          Default
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5 break-words">
+                      {addr.address}
+                    </p>
+                    {addr.apartment && (
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {addr.apartment}
+                      </p>
                     )}
                   </div>
-                  <p className="text-xs text-gray-500 truncate">
-                    {addr.address}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {!addr.isDefault && (
-                    <button
-                      onClick={() => setDefault(addr.id)}
-                      className="text-[10px] text-amber-600 hover:underline"
-                    >
-                      Set default
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {addr.mapsUrl && (
+                      <a
+                        href={addr.mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-500 hover:text-blue-600"
+                        title="Open in Google Maps"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                    {!addr.isDefault && (
+                      <button
+                        onClick={() => setDefault(addr.id)}
+                        className="text-[10px] text-amber-600 hover:underline"
+                      >
+                        Set default
+                      </button>
+                    )}
+                    <button 
+                      title="Remove Address"
+                      onClick={() => removeAddress(addr.id)}>
+                      <Trash2 className="w-3.5 h-3.5 text-gray-300 hover:text-red-400" />
                     </button>
-                  )}
-                  <button onClick={() => removeAddress(addr.id)}>
-                    <Trash2 className="w-3.5 h-3.5 text-gray-300 hover:text-red-400" />
-                  </button>
+                  </div>
                 </div>
               </div>
             ))}

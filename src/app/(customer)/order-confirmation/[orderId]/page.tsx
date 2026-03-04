@@ -6,6 +6,7 @@ import Link from "next/link";
 import { doc, getDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Order } from "@/types";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { CheckCircle, Copy, ArrowRight } from "lucide-react";
 
 export default function OrderConfirmationPage() {
@@ -13,6 +14,7 @@ export default function OrderConfirmationPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const { fmt } = useCurrency();
 
   useEffect(() => {
     if (!orderId) return;
@@ -138,22 +140,22 @@ export default function OrderConfirmationPage() {
           {order.discount > 0 && (
             <div className="flex justify-between text-green-600">
               <span>Discount</span>
-              <span>-${order.discount.toFixed(2)}</span>
+              <span>-{fmt(order.discount)}</span>
             </div>
           )}
           {order.deliveryFee > 0 && (
             <div className="flex justify-between text-gray-500">
               <span>Delivery fee</span>
-              <span>${order.deliveryFee.toFixed(2)}</span>
+              <span>{fmt(order.deliveryFee)}</span>
             </div>
           )}
           <div className="flex justify-between text-gray-500">
             <span>Tax</span>
-            <span>${order.tax.toFixed(2)}</span>
+            <span>{fmt(order.tax)}</span>
           </div>
           <div className="flex justify-between font-bold text-gray-800">
             <span>Total</span>
-            <span>${order.total.toFixed(2)}</span>
+            <span>{fmt(order.total)}</span>
           </div>
         </div>
       </div>

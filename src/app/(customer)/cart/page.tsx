@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useCart } from "@/contexts/CartContext";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { PromoCode } from "@/types";
 import {
   Minus,
@@ -26,6 +27,7 @@ import {
 export default function CartPage() {
   const router = useRouter();
   const { items, updateQuantity, removeItem, totalItems, subtotal } = useCart();
+  const { fmt } = useCurrency();
 
   const [promoInput, setPromoInput] = useState("");
   const [promo, setPromo] = useState<PromoCode | null>(null);
@@ -57,7 +59,7 @@ export default function CartPage() {
         return;
       }
       if (subtotal < p.minOrderValue) {
-        setPromoError(`Minimum order $${p.minOrderValue.toFixed(2)} required.`);
+        setPromoError(`Minimum order ${fmt(p.minOrderValue)} required.`);
         return;
       }
       if (p.usageLimit > 0 && p.usageCount >= p.usageLimit) {
@@ -141,11 +143,12 @@ export default function CartPage() {
                     </p>
                   )}
                 <p className="text-amber-600 font-semibold text-sm mt-1">
-                  ${item.unitPrice.toFixed(2)} each
+                  {fmt(item.unitPrice)} each
                 </p>
                 <div className="flex items-center justify-between mt-2">
                   <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
                     <button
+                      title="updateQuantity"
                       onClick={() =>
                         updateQuantity(item.cartItemKey, item.quantity - 1)
                       }
@@ -157,6 +160,7 @@ export default function CartPage() {
                       {item.quantity}
                     </span>
                     <button
+                      title="updateQuantity"
                       onClick={() =>
                         updateQuantity(item.cartItemKey, item.quantity + 1)
                       }
@@ -167,9 +171,10 @@ export default function CartPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-bold text-gray-800">
-                      ${(item.unitPrice * item.quantity).toFixed(2)}
+                      {fmt(item.unitPrice * item.quantity)}
                     </span>
                     <button
+                      title="removeItem"
                       onClick={() => removeItem(item.cartItemKey)}
                       className="text-gray-300 hover:text-red-400"
                     >
@@ -216,7 +221,7 @@ export default function CartPage() {
                 ✓ {promo.code} —{" "}
                 {promo.discountType === "percentage"
                   ? `${promo.discountAmount}% off`
-                  : `$${promo.discountAmount} off`}
+                  : `${fmt(promo.discountAmount)} off`}
               </p>
             )}
           </div>
@@ -227,12 +232,12 @@ export default function CartPage() {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between text-gray-600">
                 <span>Subtotal</span>
-                <span>${subtotal.toFixed(2)}</span>
+                <span>{fmt(subtotal)}</span>
               </div>
               {discount > 0 && (
                 <div className="flex justify-between text-green-600">
                   <span>Discount ({promo?.code})</span>
-                  <span>-${discount.toFixed(2)}</span>
+                  <span>-{fmt(discount)}</span>
                 </div>
               )}
               <div className="flex justify-between text-gray-400 text-xs">
@@ -241,7 +246,7 @@ export default function CartPage() {
               </div>
               <div className="border-t border-gray-100 pt-2 flex justify-between font-bold text-gray-800">
                 <span>Est. Total</span>
-                <span>${(subtotal - discount).toFixed(2)}</span>
+                <span>{fmt(subtotal - discount)}</span>
               </div>
             </div>
           </div>

@@ -121,6 +121,8 @@ export default function StaffPage() {
                   setShowForm(false);
                   setError("");
                 }}
+                title="Close"
+                aria-label="Close dialog"
               >
                 <X className="w-5 h-5 text-gray-400" />
               </button>
@@ -166,6 +168,7 @@ export default function StaffPage() {
                 className={inputCls}
               />
               <select
+                title="Staff Role"
                 value={role}
                 onChange={(e) => setRole(e.target.value as StaffRole)}
                 className={inputCls}
@@ -241,6 +244,7 @@ export default function StaffPage() {
                   </td>
                   <td className="px-4 py-3">
                     <select
+                      title="Change Role"
                       value={member.role}
                       onChange={(e) =>
                         changeRole(member, e.target.value as StaffRole)
@@ -264,6 +268,14 @@ export default function StaffPage() {
                   <td className="px-4 py-3">
                     <button
                       onClick={() => toggleActive(member)}
+                      title={
+                        member.active ? "Deactivate staff" : "Activate staff"
+                      }
+                      aria-label={
+                        member.active
+                          ? `Deactivate ${member.name}`
+                          : `Activate ${member.name}`
+                      }
                       className={`flex items-center gap-1 text-xs font-medium ${member.active ? "text-red-500 hover:text-red-600" : "text-green-600 hover:text-green-700"}`}
                     >
                       {member.active ? (

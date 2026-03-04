@@ -5,6 +5,7 @@ import Link from "next/link";
 import { collection, getDocs, query, orderBy, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Customer } from "@/types";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { Search, X, ExternalLink } from "lucide-react";
 
 interface CustomerStats {
@@ -15,6 +16,7 @@ interface CustomerStats {
 const PAGE_SIZE = 15;
 
 export default function CustomersPage() {
+  const { fmt } = useCurrency();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [stats, setStats] = useState<Record<string, CustomerStats>>({});
   const [search, setSearch] = useState("");
@@ -180,7 +182,9 @@ export default function CustomersPage() {
           <div className="w-72 bg-white rounded-xl shadow-sm p-5 flex-shrink-0">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold text-gray-700">Customer Detail</h2>
-              <button onClick={() => setSelected(null)}>
+              <button
+                title="Close Detail Panel"
+                onClick={() => setSelected(null)}>
                 <X className="w-4 h-4 text-gray-400" />
               </button>
             </div>
@@ -194,7 +198,7 @@ export default function CustomersPage() {
               />
               <Detail
                 label="Total Spent"
-                value={`$${(stats[selected.id]?.totalSpent ?? 0).toFixed(2)}`}
+                value={`${fmt(stats[selected.id]?.totalSpent ?? 0)}`}
               />
               <Detail
                 label="Member Since"

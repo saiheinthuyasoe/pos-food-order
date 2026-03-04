@@ -9,6 +9,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { Order, OrderItem } from "@/types";
 import {
   BarChart,
@@ -42,6 +43,7 @@ function getHour(ts: Timestamp | null | undefined): number {
 }
 
 export default function ReportsPage() {
+  const { fmt } = useCurrency();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<7 | 30>(7);
@@ -173,7 +175,7 @@ export default function ReportsPage() {
         <KPI
           icon={<DollarSign />}
           title={`Revenue (${range}d)`}
-          value={`$${totalRevenue.toFixed(2)}`}
+          value={`${fmt(totalRevenue)}`}
           color="amber"
         />
         <KPI
@@ -185,7 +187,7 @@ export default function ReportsPage() {
         <KPI
           icon={<TrendingUp />}
           title="Avg Order Value"
-          value={`$${avgOrder.toFixed(2)}`}
+          value={`${fmt(avgOrder)}`}
           color="green"
         />
         <KPI
@@ -208,9 +210,7 @@ export default function ReportsPage() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip
-                formatter={(v) => [`$${Number(v).toFixed(2)}`, "Revenue"]}
-              />
+              <Tooltip formatter={(v) => [`${fmt(Number(v))}`, "Revenue"]} />
               <Bar dataKey="revenue" fill="#f59e0b" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>

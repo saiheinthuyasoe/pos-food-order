@@ -6,6 +6,7 @@ import Link from "next/link";
 import { doc, onSnapshot, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Order, OrderStatus } from "@/types";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { CheckCircle, Circle, Clock } from "lucide-react";
 
 const WALKIN_STEPS: { status: OrderStatus; label: string }[] = [
@@ -41,6 +42,7 @@ export default function OrderTrackingPage() {
   const { orderId } = useParams<{ orderId: string }>();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const { fmt } = useCurrency();
 
   useEffect(() => {
     if (!orderId) return;
@@ -171,14 +173,12 @@ export default function OrderTrackingPage() {
               <span className="text-gray-600">
                 {item.name} ×{item.quantity}
               </span>
-              <span className="text-gray-700">
-                ${item.lineTotal.toFixed(2)}
-              </span>
+              <span className="text-gray-700">{fmt(item.lineTotal)}</span>
             </div>
           ))}
           <div className="border-t border-gray-100 pt-2 flex justify-between text-sm font-bold text-gray-800">
             <span>Total</span>
-            <span>${order.total.toFixed(2)}</span>
+            <span>{fmt(order.total)}</span>
           </div>
         </div>
       </div>

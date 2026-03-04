@@ -19,6 +19,19 @@ export interface RestaurantSettings {
   taxRate: number; // percentage e.g. 7 = 7%
   prepTimeWalkIn: number; // minutes
   prepTimeDelivery: number; // minutes
+  currency: string; // symbol e.g. "$", "€", "฿"
+  promptPayQrUrl?: string; // uploaded PromptPay QR image URL
+}
+
+// ─── Notification Settings ────────────────────────────────────────────────
+export type NotificationSoundType = "ding" | "chime" | "alert";
+
+export interface NotificationSettings {
+  soundEnabled: boolean;
+  volume: number; // 0–100
+  soundType: NotificationSoundType;
+  newOrderAlert: boolean; // play sound for new pending orders
+  readyAlert: boolean; // play sound when order is ready
 }
 
 // ─── Category ─────────────────────────────────────────────────────────────
@@ -83,6 +96,7 @@ export interface StaffMember {
 
 // ─── Order ────────────────────────────────────────────────────────────────
 export type OrderStatus =
+  | "awaiting_payment" // delivery + scan: order placed, waiting for customer receipt upload
   | "pending"
   | "confirmed"
   | "preparing"
@@ -139,6 +153,7 @@ export interface Order {
   createdAt: Timestamp;
   estimatedReadyAt?: Timestamp;
   paidAt?: Timestamp;
+  paymentReceiptUrl?: string; // customer-uploaded PromptPay receipt (scan orders)
 }
 
 // ─── Promo Code ───────────────────────────────────────────────────────────
@@ -182,5 +197,28 @@ export interface SavedAddress {
   id: string;
   label: string;
   address: string;
+  apartment?: string; // Apartment / Floor
+  mapsUrl?: string; // Google Maps share link
   isDefault: boolean;
+}
+
+// ─── Expense ──────────────────────────────────────────────────────────────
+export type ExpenseCategory =
+  | "ingredients"
+  | "utilities"
+  | "staff"
+  | "rent"
+  | "marketing"
+  | "maintenance"
+  | "other";
+
+export interface Expense {
+  id: string;
+  description: string;
+  amount: number;
+  category: ExpenseCategory;
+  date: Timestamp; // date the expense occurred
+  note?: string;
+  createdAt: Timestamp;
+  createdBy?: string; // admin uid
 }

@@ -14,7 +14,7 @@ import {
 import { db } from "@/lib/firebase";
 import { Order, StaffMember } from "@/types";
 import { getDocs } from "firebase/firestore";
-import { Eye } from "lucide-react";
+import { Eye, Receipt } from "lucide-react";
 
 export default function DeliveryPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -26,7 +26,7 @@ export default function DeliveryPage() {
     const q = query(
       collection(db, "orders"),
       where("orderType", "==", "delivery"),
-      where("status", "not-in", ["delivered", "cancelled"]),
+      where("status", "not-in", ["awaiting_payment", "delivered", "cancelled"]),
       orderBy("status"),
       orderBy("createdAt", "desc"),
     );
@@ -104,6 +104,9 @@ export default function DeliveryPage() {
                 <th className="text-left px-4 py-3 text-gray-500 font-medium">
                   Status
                 </th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium">
+                  Payment Slip
+                </th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -129,6 +132,7 @@ export default function DeliveryPage() {
                   </td>
                   <td className="px-4 py-3">
                     <select
+                      title="Assign Delivery Staff"
                       value={order.assignedDeliveryStaffId ?? ""}
                       onChange={(e) => {
                         const staff = deliveryStaff.find(
@@ -152,6 +156,26 @@ export default function DeliveryPage() {
                     >
                       {order.status.replace("_", " ")}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {order.paymentMethod === "scan" ? (
+                      order.paymentReceiptUrl ? (
+                        <a
+                          href={order.paymentReceiptUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 font-medium"
+                        >
+                          <Receipt className="w-3.5 h-3.5" /> View Slip
+                        </a>
+                      ) : (
+                        <span className="text-xs text-yellow-600">
+                          ⏳ Awaiting slip
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <Link

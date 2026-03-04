@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   collection,
   query,
@@ -13,6 +14,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { Order, PaymentMethod, RestaurantSettings } from "@/types";
 import { printTableReceipt } from "@/lib/printReceipt";
 import {
@@ -24,6 +26,8 @@ import {
   Clock,
   X,
   Printer,
+  Truck,
+  MapPin,
 } from "lucide-react";
 
 const METHOD_OPTIONS: {
@@ -36,9 +40,18 @@ const METHOD_OPTIONS: {
   { method: "scan", label: "Scan QR", icon: QrCode },
 ];
 
+type CashierTab = "walkin" | "delivery";
+
 export default function CashierPage() {
+  const { adminRole } = useAuth();
+  const isDeliveryOnly = adminRole === "delivery";
+  const [activeTab, setActiveTab] = useState<CashierTab>("walkin");
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
   const [paidToday, setPaidToday] = useState<Order[]>([]);
+  const [pendingDeliveryOrders, setPendingDeliveryOrders] = useState<Order[]>(
+    [],
+  );
+  const [paidDeliveryToday, setPaidDeliveryToday] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Restaurant settings for receipts
@@ -48,6 +61,12 @@ export default function CashierPage() {
   const [collectingOrders, setCollectingOrders] = useState<Order[]>([]);
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("cash");
   const [processingPayment, setProcessingPayment] = useState(false);
+  const { fmt } = useCurrency();
+
+  // Delivery-role users always see the delivery tab
+  useEffect(() => {
+    if (isDeliveryOnly) setActiveTab("delivery");
+  }, [isDeliveryOnly]);
 
   // Fetch restaurant settings once
   useEffect(() => {
@@ -56,50 +75,65 @@ export default function CashierPage() {
     });
   }, []);
 
-  // Real-time: pending walk-in payments
+  // Real-time: all pending payments — split by orderType
   useEffect(() => {
     const unsub = onSnapshot(
       query(collection(db, "orders"), where("paymentStatus", "==", "pending")),
       (snap) => {
-        const walkinPending = snap.docs
-          .map((d) => ({ id: d.id, ...d.data() }) as Order)
-          .filter((o) => o.orderType === "walkin")
-          .sort(
-            (a, b) =>
-              ((a.createdAt as Timestamp)?.toMillis() ?? 0) -
-              ((b.createdAt as Timestamp)?.toMillis() ?? 0),
-          );
-        setPendingOrders(walkinPending);
+        const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Order);
+        const sortAsc = (a: Order, b: Order) =>
+          ((a.createdAt as Timestamp)?.toMillis() ?? 0) -
+          ((b.createdAt as Timestamp)?.toMillis() ?? 0);
+        setPendingOrders(
+          all.filter((o) => o.orderType === "walkin").sort(sortAsc),
+        );
+        setPendingDeliveryOrders(
+          all
+            .filter(
+              (o) =>
+                o.orderType === "delivery" && o.status !== "awaiting_payment",
+            )
+            .sort(
+              (a, b) =>
+                ((b.createdAt as Timestamp)?.toMillis() ?? 0) -
+                ((a.createdAt as Timestamp)?.toMillis() ?? 0),
+            ),
+        );
         setLoading(false);
       },
     );
     return () => unsub();
   }, []);
 
-  // Real-time: today's collected walk-in payments
+  // Real-time: today's collected payments — split by orderType
   useEffect(() => {
     const unsub = onSnapshot(
       query(collection(db, "orders"), where("paymentStatus", "==", "paid")),
       (snap) => {
         const todayStr = new Date().toDateString();
-        const todayPaid = snap.docs
-          .map((d) => ({ id: d.id, ...d.data() }) as Order)
-          .filter((o) => {
-            if (o.orderType !== "walkin") return false;
-            const ts =
-              (o.paidAt as Timestamp | undefined) ?? (o.createdAt as Timestamp);
-            return ts?.toDate().toDateString() === todayStr;
-          })
-          .sort(
-            (a, b) =>
-              ((b.paidAt as Timestamp | undefined)?.toMillis() ??
-                (b.createdAt as Timestamp)?.toMillis() ??
-                0) -
-              ((a.paidAt as Timestamp | undefined)?.toMillis() ??
-                (a.createdAt as Timestamp)?.toMillis() ??
-                0),
-          );
-        setPaidToday(todayPaid);
+        const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Order);
+        const sortDesc = (a: Order, b: Order) =>
+          ((b.paidAt as Timestamp | undefined)?.toMillis() ??
+            (b.createdAt as Timestamp)?.toMillis() ??
+            0) -
+          ((a.paidAt as Timestamp | undefined)?.toMillis() ??
+            (a.createdAt as Timestamp)?.toMillis() ??
+            0);
+        const isToday = (o: Order) => {
+          const ts =
+            (o.paidAt as Timestamp | undefined) ?? (o.createdAt as Timestamp);
+          return ts?.toDate().toDateString() === todayStr;
+        };
+        setPaidToday(
+          all
+            .filter((o) => o.orderType === "walkin" && isToday(o))
+            .sort(sortDesc),
+        );
+        setPaidDeliveryToday(
+          all
+            .filter((o) => o.orderType === "delivery" && isToday(o))
+            .sort(sortDesc),
+        );
       },
     );
     return () => unsub();
@@ -123,30 +157,45 @@ export default function CashierPage() {
   const confirmPayment = async () => {
     if (collectingOrders.length === 0) return;
     setProcessingPayment(true);
+    const isDelivery = collectingOrders[0].orderType === "delivery";
     const taxRate = (settings?.taxRate ?? 0) / 100;
     try {
       const updatedOrders: Order[] = await Promise.all(
         collectingOrders.map(async (o) => {
-          const taxableBase = o.subtotal - o.discount + o.deliveryFee;
-          const tax = parseFloat((taxableBase * taxRate).toFixed(2));
-          const total = parseFloat((taxableBase + tax).toFixed(2));
-          await updateDoc(doc(db, "orders", o.id), {
-            paymentMethod: selectedMethod,
-            paymentStatus: "paid",
-            paidAt: serverTimestamp(),
-            tax,
-            total,
-          });
-          return {
-            ...o,
-            paymentMethod: selectedMethod,
-            paymentStatus: "paid" as const,
-            tax,
-            total,
-          };
+          if (isDelivery) {
+            // Delivery totals are already final from checkout — just mark paid
+            await updateDoc(doc(db, "orders", o.id), {
+              paymentMethod: selectedMethod,
+              paymentStatus: "paid",
+              paidAt: serverTimestamp(),
+            });
+            return {
+              ...o,
+              paymentMethod: selectedMethod,
+              paymentStatus: "paid" as const,
+            };
+          } else {
+            // Walk-in: calculate tax at payment time
+            const taxableBase = o.subtotal - o.discount + o.deliveryFee;
+            const tax = parseFloat((taxableBase * taxRate).toFixed(2));
+            const total = parseFloat((taxableBase + tax).toFixed(2));
+            await updateDoc(doc(db, "orders", o.id), {
+              paymentMethod: selectedMethod,
+              paymentStatus: "paid",
+              paidAt: serverTimestamp(),
+              tax,
+              total,
+            });
+            return {
+              ...o,
+              paymentMethod: selectedMethod,
+              paymentStatus: "paid" as const,
+              tax,
+              total,
+            };
+          }
         }),
       );
-      // Print combined receipt with final tax-inclusive totals
       handlePrint(updatedOrders);
       setCollectingOrders([]);
     } finally {
@@ -159,7 +208,9 @@ export default function CashierPage() {
   const grouped = new Map<string, Order[]>();
   for (const order of pendingOrders) {
     const key =
-      order.tableNumber != null ? `table-${order.tableNumber}` : `solo-${order.id}`;
+      order.tableNumber != null
+        ? `table-${order.tableNumber}`
+        : `solo-${order.id}`;
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key)!.push(order);
   }
@@ -172,6 +223,10 @@ export default function CashierPage() {
   }
 
   const todayRevenue = paidToday.reduce((sum, o) => sum + o.total, 0);
+  const todayDeliveryRevenue = paidDeliveryToday.reduce(
+    (sum, o) => sum + o.total,
+    0,
+  );
 
   return (
     <div className="p-6 max-w-5xl">
@@ -180,138 +235,297 @@ export default function CashierPage() {
         <h1 className="text-2xl font-bold text-gray-800">Cashier</h1>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <StatCard
-          label="Pending Payments"
-          value={String(tableGroups.length)}
-          color="amber"
-        />
-        <StatCard
-          label="Collected Today"
-          value={String(paidToday.length)}
-          color="green"
-        />
-        <StatCard
-          label="Today's Revenue"
-          value={`$${todayRevenue.toFixed(2)}`}
-          color="blue"
-        />
+      {/* Tabs — Walk-in tab hidden for delivery-only accounts */}
+      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 w-fit">
+        {!isDeliveryOnly && (
+          <button
+            onClick={() => setActiveTab("walkin")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === "walkin"
+                ? "bg-white text-amber-700 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            <Wallet className="w-4 h-4" />
+            Walk-in
+            {pendingOrders.length > 0 && (
+              <span className="bg-amber-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                {pendingOrders.length}
+              </span>
+            )}
+          </button>
+        )}
+        <button
+          onClick={() => setActiveTab("delivery")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+            activeTab === "delivery"
+              ? "bg-white text-blue-700 shadow-sm"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          <Truck className="w-4 h-4" />
+          Delivery
+          {pendingDeliveryOrders.length > 0 && (
+            <span className="bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+              {pendingDeliveryOrders.length}
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* Pending payments */}
-      <div className="mb-8">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-          Pending Payments
-        </h2>
+      {/* Stats */}
+      {activeTab === "walkin" ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <StatCard
+            label="Pending Payments"
+            value={String(tableGroups.length)}
+            color="amber"
+          />
+          <StatCard
+            label="Collected Today"
+            value={String(paidToday.length)}
+            color="green"
+          />
+          <StatCard
+            label="Today's Revenue"
+            value={`${fmt(todayRevenue)}`}
+            color="blue"
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <StatCard
+            label="Pending Delivery"
+            value={String(pendingDeliveryOrders.length)}
+            color="amber"
+          />
+          <StatCard
+            label="Collected Today"
+            value={String(paidDeliveryToday.length)}
+            color="green"
+          />
+          <StatCard
+            label="Delivery Revenue"
+            value={`${fmt(todayDeliveryRevenue)}`}
+            color="blue"
+          />
+        </div>
+      )}
 
-        {loading ? (
-          <p className="text-gray-400 text-sm">Loading…</p>
-        ) : pendingOrders.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-10 text-center">
-            <CheckCircle className="w-10 h-10 text-green-400 mx-auto mb-3" />
-            <p className="font-medium text-gray-600">All caught up!</p>
-            <p className="text-sm text-gray-400 mt-1">No pending payments.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {tableGroups.map(({ key, label, orders }) => {
-              const allItems = orders.flatMap((o) => o.items);
-              const groupTotal = orders.reduce((s, o) => s + o.total, 0);
-              const hasMultiple = orders.length > 1;
-              return (
+      {/* Walk-in: Pending payments */}
+      {activeTab === "walkin" && (
+        <div className="mb-8">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Pending Walk-in Payments
+          </h2>
+
+          {loading ? (
+            <p className="text-gray-400 text-sm">Loading…</p>
+          ) : pendingOrders.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm p-10 text-center">
+              <CheckCircle className="w-10 h-10 text-green-400 mx-auto mb-3" />
+              <p className="font-medium text-gray-600">All caught up!</p>
+              <p className="text-sm text-gray-400 mt-1">
+                No pending walk-in payments.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {tableGroups.map(({ key, label, orders }) => {
+                const allItems = orders.flatMap((o) => o.items);
+                const groupTotal = orders.reduce((s, o) => s + o.total, 0);
+                const hasMultiple = orders.length > 1;
+                return (
+                  <div
+                    key={key}
+                    className="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
+                          {label}
+                        </span>
+                        {hasMultiple && (
+                          <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                            {orders.length} orders
+                          </span>
+                        )}
+                        {!hasMultiple && (
+                          <span
+                            className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${
+                              orders[0].status === "delivered"
+                                ? "bg-green-100 text-green-700"
+                                : orders[0].status === "ready"
+                                  ? "bg-purple-100 text-purple-700"
+                                  : "bg-orange-100 text-orange-700"
+                            }`}
+                          >
+                            {orders[0].status.replace("_", " ")}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm font-medium text-gray-800 truncate">
+                        {orders[0].customerName}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5 truncate">
+                        {allItems
+                          .slice(0, 3)
+                          .map((i) => `${i.name} ×${i.quantity}`)
+                          .join(", ")}
+                        {allItems.length > 3 && ` +${allItems.length - 3} more`}
+                      </p>
+                      {hasMultiple && (
+                        <div className="mt-1.5 space-y-0.5">
+                          {orders.map((o) => (
+                            <p
+                              key={o.id}
+                              className="text-xs text-gray-400 flex items-center gap-1"
+                            >
+                              <span className="font-mono text-gray-300">
+                                #{o.id.slice(-6).toUpperCase()}
+                              </span>
+                              <span>{fmt(o.total)}</span>
+                              <span
+                                className={`ml-1 px-1.5 py-0 rounded-full ${
+                                  o.status === "delivered"
+                                    ? "bg-green-100 text-green-700"
+                                    : o.status === "ready"
+                                      ? "bg-purple-100 text-purple-700"
+                                      : "bg-orange-100 text-orange-700"
+                                }`}
+                              >
+                                {o.status.replace("_", " ")}
+                              </span>
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                      {!hasMultiple && (
+                        <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {(orders[0].createdAt as Timestamp)
+                            ?.toDate()
+                            .toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-2xl font-bold text-gray-800">
+                        {fmt(groupTotal)}
+                      </p>
+                      <button
+                        onClick={() => openCollect(orders)}
+                        className="mt-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-lg transition-colors"
+                      >
+                        Collect Payment
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Delivery: Pending payments */}
+      {activeTab === "delivery" && (
+        <div className="mb-8">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Pending Delivery Payments
+          </h2>
+          {loading ? (
+            <p className="text-gray-400 text-sm">Loading…</p>
+          ) : pendingDeliveryOrders.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm p-10 text-center">
+              <CheckCircle className="w-10 h-10 text-green-400 mx-auto mb-3" />
+              <p className="font-medium text-gray-600">All caught up!</p>
+              <p className="text-sm text-gray-400 mt-1">
+                No pending delivery payments.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pendingDeliveryOrders.map((o) => (
                 <div
-                  key={key}
+                  key={o.id}
                   className="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
-                        {label}
+                      <span className="text-xs font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded">
+                        Delivery
                       </span>
-                      {hasMultiple && (
-                        <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
-                          {orders.length} orders
-                        </span>
-                      )}
-                      {!hasMultiple && (
-                        <span
-                          className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${
-                            orders[0].status === "delivered"
-                              ? "bg-green-100 text-green-700"
-                              : orders[0].status === "ready"
-                                ? "bg-purple-100 text-purple-700"
-                                : "bg-orange-100 text-orange-700"
-                          }`}
-                        >
-                          {orders[0].status.replace("_", " ")}
-                        </span>
-                      )}
+                      <span
+                        className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${
+                          o.status === "delivered"
+                            ? "bg-green-100 text-green-700"
+                            : o.status === "out_for_delivery"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-orange-100 text-orange-700"
+                        }`}
+                      >
+                        {o.status.replace("_", " ")}
+                      </span>
+                      <span className="text-xs font-mono text-gray-400">
+                        #{o.id.slice(-6).toUpperCase()}
+                      </span>
                     </div>
-                    <p className="text-sm font-medium text-gray-800 truncate">
-                      {orders[0].customerName}
+                    <p className="text-sm font-medium text-gray-800">
+                      {o.customerName}
                     </p>
+                    {o.deliveryAddress && (
+                      <p className="text-xs text-gray-400 mt-0.5 flex items-start gap-1">
+                        <MapPin className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                        <span className="truncate">{o.deliveryAddress}</span>
+                      </p>
+                    )}
                     <p className="text-xs text-gray-400 mt-0.5 truncate">
-                      {allItems
+                      {o.items
                         .slice(0, 3)
                         .map((i) => `${i.name} ×${i.quantity}`)
                         .join(", ")}
-                      {allItems.length > 3 && ` +${allItems.length - 3} more`}
+                      {o.items.length > 3 && ` +${o.items.length - 3} more`}
                     </p>
-                    {hasMultiple && (
-                      <div className="mt-1.5 space-y-0.5">
-                        {orders.map((o) => (
-                          <p key={o.id} className="text-xs text-gray-400 flex items-center gap-1">
-                            <span className="font-mono text-gray-300">#{o.id.slice(-6).toUpperCase()}</span>
-                            <span>${o.total.toFixed(2)}</span>
-                            <span
-                              className={`ml-1 px-1.5 py-0 rounded-full ${
-                                o.status === "delivered"
-                                  ? "bg-green-100 text-green-700"
-                                  : o.status === "ready"
-                                    ? "bg-purple-100 text-purple-700"
-                                    : "bg-orange-100 text-orange-700"
-                              }`}
-                            >
-                              {o.status.replace("_", " ")}
-                            </span>
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                    {!hasMultiple && (
-                      <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {(orders[0].createdAt as Timestamp)
-                          ?.toDate()
-                          .toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                      </p>
-                    )}
+                    <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {(o.createdAt as Timestamp)
+                        ?.toDate()
+                        .toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                    </p>
                   </div>
-
                   <div className="text-right flex-shrink-0">
                     <p className="text-2xl font-bold text-gray-800">
-                      ${groupTotal.toFixed(2)}
+                      {fmt(o.total)}
+                    </p>
+                    <p className="text-xs text-gray-400 mb-2">
+                      {o.paymentMethod === "scan"
+                        ? "Scan QR"
+                        : (o.paymentMethod ?? "cash")}
                     </p>
                     <button
-                      onClick={() => openCollect(orders)}
-                      className="mt-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-lg transition-colors"
+                      onClick={() => openCollect([o])}
+                      className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-lg transition-colors"
                     >
-                      Collect Payment
+                      Complete Payment
                     </button>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* Collected today */}
-      {paidToday.length > 0 && (
+      {/* Walk-in: Collected today */}
+      {activeTab === "walkin" && paidToday.length > 0 && (
         <div>
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
             Collected Today
@@ -357,7 +571,81 @@ export default function CashierPage() {
                       {o.paymentMethod === "scan" ? "Scan QR" : o.paymentMethod}
                     </td>
                     <td className="px-4 py-3 font-semibold text-green-700">
-                      ${o.total.toFixed(2)}
+                      {fmt(o.total)}
+                    </td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">
+                      {(o.paidAt as Timestamp | undefined)
+                        ?.toDate()
+                        .toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }) ?? "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handlePrint([o])}
+                        title="Print Receipt"
+                        className="text-gray-400 hover:text-gray-700 transition-colors"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Delivery: Collected today */}
+      {activeTab === "delivery" && paidDeliveryToday.length > 0 && (
+        <div>
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Collected Today
+          </h2>
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="border-b border-gray-100">
+                <tr>
+                  {[
+                    "Order",
+                    "Customer",
+                    "Address",
+                    "Method",
+                    "Amount",
+                    "Time",
+                    "",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className="text-left px-4 py-3 text-gray-500 font-medium text-xs"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {paidDeliveryToday.map((o) => (
+                  <tr
+                    key={o.id}
+                    className="border-b border-gray-50 last:border-0 hover:bg-gray-50"
+                  >
+                    <td className="px-4 py-3 font-mono text-xs text-blue-600 font-semibold">
+                      #{o.id.slice(-6).toUpperCase()}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-gray-800">
+                      {o.customerName}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 text-xs max-w-[160px] truncate">
+                      {o.deliveryAddress ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 capitalize text-gray-600">
+                      {o.paymentMethod === "scan" ? "Scan QR" : o.paymentMethod}
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-green-700">
+                      {fmt(o.total)}
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-xs">
                       {(o.paidAt as Timestamp | undefined)
@@ -385,118 +673,212 @@ export default function CashierPage() {
       )}
 
       {/* Collect Payment Modal */}
-      {collectingOrders.length > 0 && (() => {
-        const first = collectingOrders[0];
-        const taxRate = (settings?.taxRate ?? 0) / 100;
-        // Re-compute tax-inclusive totals for display (walk-in orders have tax=0 until now)
-        const computedOrders = collectingOrders.map((o) => {
-          const taxableBase = o.subtotal - o.discount + o.deliveryFee;
-          const tax = parseFloat((taxableBase * taxRate).toFixed(2));
-          const total = parseFloat((taxableBase + tax).toFixed(2));
-          return { ...o, tax, total };
-        });
-        const preTaxTotal = collectingOrders.reduce((s, o) => s + o.subtotal - o.discount + o.deliveryFee, 0);
-        const totalTax = parseFloat((preTaxTotal * taxRate).toFixed(2));
-        const grandTotal = parseFloat((preTaxTotal + totalTax).toFixed(2));
-        const tableLabel = first.tableNumber != null ? `Table ${first.tableNumber}` : `#${first.id.slice(-6).toUpperCase()}`;
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-5">
-                <div>
-                  <h2 className="font-bold text-gray-800 text-lg">
-                    Collect Payment
-                  </h2>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {tableLabel}
-                    {collectingOrders.length > 1 && ` · ${collectingOrders.length} orders`}
-                  </p>
+      {collectingOrders.length > 0 &&
+        (() => {
+          const first = collectingOrders[0];
+          const isDeliveryPayment = first.orderType === "delivery";
+          const taxRate = (settings?.taxRate ?? 0) / 100;
+          // Walk-in: re-compute tax-inclusive totals. Delivery: use existing totals.
+          const computedOrders = collectingOrders.map((o) => {
+            if (isDeliveryPayment) return o;
+            const taxableBase = o.subtotal - o.discount + o.deliveryFee;
+            const tax = parseFloat((taxableBase * taxRate).toFixed(2));
+            const total = parseFloat((taxableBase + tax).toFixed(2));
+            return { ...o, tax, total };
+          });
+          const grandTotal = isDeliveryPayment
+            ? collectingOrders.reduce((s, o) => s + o.total, 0)
+            : parseFloat(
+                (
+                  collectingOrders.reduce(
+                    (s, o) => s + o.subtotal - o.discount + o.deliveryFee,
+                    0,
+                  ) *
+                  (1 + taxRate)
+                ).toFixed(2),
+              );
+          const totalTax = isDeliveryPayment
+            ? collectingOrders.reduce((s, o) => s + o.tax, 0)
+            : parseFloat(
+                (
+                  collectingOrders.reduce(
+                    (s, o) => s + o.subtotal - o.discount + o.deliveryFee,
+                    0,
+                  ) * taxRate
+                ).toFixed(2),
+              );
+          const tableLabel = isDeliveryPayment
+            ? `Delivery · ${first.customerName}`
+            : first.tableNumber != null
+              ? `Table ${first.tableNumber}`
+              : `#${first.id.slice(-6).toUpperCase()}`;
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h2 className="font-bold text-gray-800 text-lg">
+                      {isDeliveryPayment
+                        ? "Complete Payment"
+                        : "Collect Payment"}
+                    </h2>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {tableLabel}
+                      {collectingOrders.length > 1 &&
+                        ` · ${collectingOrders.length} orders`}
+                    </p>
+                  </div>
+                  <button
+                    title="CollectingOrders"
+                    onClick={() => setCollectingOrders([])}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
+
+                {/* Amount due */}
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-5 text-center">
+                  <p className="text-xs text-amber-600 mb-1 font-medium">
+                    Amount Due
+                  </p>
+                  <p className="text-4xl font-bold text-amber-700">
+                    {fmt(grandTotal)}
+                  </p>
+                  {taxRate > 0 && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      incl. tax {fmt(totalTax)} ({settings?.taxRate}%)
+                    </p>
+                  )}
+                  <p className="text-sm text-amber-600 mt-1">
+                    {first.customerName}
+                  </p>
+                  {computedOrders.length > 1 && (
+                    <div className="mt-2 text-left space-y-0.5">
+                      {computedOrders.map((o) => (
+                        <div
+                          key={o.id}
+                          className="flex justify-between text-xs text-amber-700"
+                        >
+                          <span className="font-mono">
+                            #{o.id.slice(-6).toUpperCase()}
+                          </span>
+                          <span>{fmt(o.total)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Payment info / method picker */}
+                {isDeliveryPayment ? (
+                  <div className="mb-5 space-y-3">
+                    <div className="flex items-center gap-2.5 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                      {first.paymentMethod === "cash" ? (
+                        <Banknote className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                      ) : (
+                        <QrCode className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                      )}
+                      <span className="text-sm font-medium text-gray-700">
+                        {first.paymentMethod === "scan"
+                          ? "Scan QR (PromptPay)"
+                          : "Cash on Delivery"}
+                      </span>
+                    </div>
+
+                    {first.paymentMethod === "scan" &&
+                      (first.paymentReceiptUrl ? (
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 mb-1.5">
+                            Customer Payment Slip
+                          </p>
+                          <a
+                            href={first.paymentReceiptUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <img
+                              src={first.paymentReceiptUrl}
+                              alt="Payment slip"
+                              className="w-full max-h-48 object-contain rounded-xl border border-gray-200 bg-gray-50"
+                            />
+                          </a>
+                          <p className="text-xs text-green-600 mt-1 text-center">
+                            ✓ Slip received — verify before confirming
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-xl text-center">
+                          <p className="text-xs text-yellow-700">
+                            ⏳ Waiting for customer to upload payment slip…
+                          </p>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                      Payment Method
+                    </p>
+                    <div className="grid grid-cols-3 gap-2 mb-5">
+                      {METHOD_OPTIONS.map(({ method, label, icon: Icon }) => (
+                        <button
+                          key={method}
+                          onClick={() => setSelectedMethod(method)}
+                          className={`flex flex-col items-center gap-2 py-3 px-2 rounded-xl border-2 transition-all ${
+                            selectedMethod === method
+                              ? "border-amber-500 bg-amber-50"
+                              : "border-gray-200 hover:border-gray-300"
+                          }`}
+                        >
+                          <Icon
+                            className={`w-5 h-5 ${
+                              selectedMethod === method
+                                ? "text-amber-600"
+                                : "text-gray-400"
+                            }`}
+                          />
+                          <span
+                            className={`text-xs font-medium ${
+                              selectedMethod === method
+                                ? "text-amber-700"
+                                : "text-gray-600"
+                            }`}
+                          >
+                            {label}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
                 <button
-                  onClick={() => setCollectingOrders([])}
-                  className="text-gray-400 hover:text-gray-600"
+                  onClick={confirmPayment}
+                  disabled={
+                    processingPayment ||
+                    (isDeliveryPayment &&
+                      first.paymentMethod === "scan" &&
+                      !first.paymentReceiptUrl)
+                  }
+                  className="w-full py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl disabled:opacity-60 transition-colors text-sm"
                 >
-                  <X className="w-5 h-5" />
+                  {processingPayment
+                    ? "Processing…"
+                    : isDeliveryPayment
+                      ? "Complete Payment"
+                      : `Confirm ${
+                          selectedMethod === "scan"
+                            ? "Scan QR"
+                            : selectedMethod.charAt(0).toUpperCase() +
+                              selectedMethod.slice(1)
+                        } Payment`}
                 </button>
               </div>
-
-              {/* Amount due */}
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-5 text-center">
-                <p className="text-xs text-amber-600 mb-1 font-medium">
-                  Amount Due
-                </p>
-                <p className="text-4xl font-bold text-amber-700">
-                  ${grandTotal.toFixed(2)}
-                </p>
-                {taxRate > 0 && (
-                  <p className="text-xs text-amber-600 mt-1">
-                    incl. tax ${totalTax.toFixed(2)} ({settings?.taxRate}%)
-                  </p>
-                )}
-                <p className="text-sm text-amber-600 mt-1">
-                  {first.customerName}
-                </p>
-                {computedOrders.length > 1 && (
-                  <div className="mt-2 text-left space-y-0.5">
-                    {computedOrders.map((o) => (
-                      <div key={o.id} className="flex justify-between text-xs text-amber-700">
-                        <span className="font-mono">#{o.id.slice(-6).toUpperCase()}</span>
-                        <span>${o.total.toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Method picker */}
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                Payment Method
-              </p>
-              <div className="grid grid-cols-3 gap-2 mb-5">
-                {METHOD_OPTIONS.map(({ method, label, icon: Icon }) => (
-                  <button
-                    key={method}
-                    onClick={() => setSelectedMethod(method)}
-                    className={`flex flex-col items-center gap-2 py-3 px-2 rounded-xl border-2 transition-all ${
-                      selectedMethod === method
-                        ? "border-amber-500 bg-amber-50"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    <Icon
-                      className={`w-5 h-5 ${
-                        selectedMethod === method
-                          ? "text-amber-600"
-                          : "text-gray-400"
-                      }`}
-                    />
-                    <span
-                      className={`text-xs font-medium ${
-                        selectedMethod === method
-                          ? "text-amber-700"
-                          : "text-gray-600"
-                      }`}
-                    >
-                      {label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              <button
-                onClick={confirmPayment}
-                disabled={processingPayment}
-                className="w-full py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl disabled:opacity-60 transition-colors text-sm"
-              >
-                {processingPayment
-                  ? "Processing…"
-                  : `Confirm ${selectedMethod === "scan" ? "Scan QR" : selectedMethod.charAt(0).toUpperCase() + selectedMethod.slice(1)} Payment`}
-              </button>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
     </div>
   );
 }

@@ -1,12 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  query,
+  orderBy,
+  onSnapshot,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Order, OrderStatus } from "@/types";
+import { Order, OrderStatus, NotificationSettings } from "@/types";
 import { Eye } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCurrency } from "@/contexts/CurrencyContext";
+import { playNotificationSound } from "@/lib/notificationSound";
+
+const NOTIF_DEFAULTS: NotificationSettings = {
+  soundEnabled: true,
+  volume: 70,
+  soundType: "ding",
+  newOrderAlert: true,
+  readyAlert: false,
+};
 
 const ALL_TABS: {
   label: string;
@@ -57,6 +74,23 @@ export default function OrdersPage() {
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const { adminRole } = useAuth();
+  const { fmt } = useCurrency();
+
+  // Track known order IDs and their statuses to detect new/changed orders
+  const knownOrders = useRef<Map<string, OrderStatus>>(new Map());
+  const initialized = useRef(false);
+  const notifSettings = useRef<NotificationSettings>(NOTIF_DEFAULTS);
+
+  // Fetch notification settings once
+  useEffect(() => {
+    getDoc(doc(db, "settings", "notifications")).then((snap) => {
+      if (snap.exists())
+        notifSettings.current = {
+          ...NOTIF_DEFAULTS,
+          ...snap.data(),
+        } as NotificationSettings;
+    });
+  }, []);
 
   const TABS = ALL_TABS.filter((t) =>
     adminRole ? t.roles.includes(adminRole) : true,
@@ -65,7 +99,53 @@ export default function OrdersPage() {
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
     return onSnapshot(q, (snap) => {
-      setOrders(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Order));
+      const incoming = snap.docs.map(
+        (d) => ({ id: d.id, ...d.data() }) as Order,
+      );
+
+      if (!initialized.current) {
+        // First load — populate known orders silently
+        incoming.forEach((o) => knownOrders.current.set(o.id, o.status));
+        initialized.current = true;
+      } else {
+        const ns = notifSettings.current;
+        if (ns.soundEnabled) {
+          const soundOpts = { volume: ns.volume, type: ns.soundType };
+          for (const order of incoming) {
+            const prevStatus = knownOrders.current.get(order.id);
+            const isNew = prevStatus === undefined;
+
+            // New non-scan order arriving as pending
+            if (isNew && order.status === "pending" && ns.newOrderAlert) {
+              playNotificationSound(soundOpts);
+              break;
+            }
+            // Scan/delivery order: customer just uploaded receipt → now visible
+            if (
+              !isNew &&
+              prevStatus === "awaiting_payment" &&
+              order.status === "pending" &&
+              ns.newOrderAlert
+            ) {
+              playNotificationSound(soundOpts);
+              break;
+            }
+            if (
+              !isNew &&
+              prevStatus !== "ready" &&
+              order.status === "ready" &&
+              ns.readyAlert
+            ) {
+              playNotificationSound(soundOpts);
+              break;
+            }
+          }
+        }
+        incoming.forEach((o) => knownOrders.current.set(o.id, o.status));
+      }
+
+      // Hide awaiting_payment orders — they haven't paid yet
+      setOrders(incoming.filter((o) => o.status !== "awaiting_payment"));
       setLoading(false);
     });
   }, []);
@@ -174,7 +254,7 @@ export default function OrdersPage() {
                       .join(", ")}
                   </td>
                   <td className="px-4 py-3 font-medium text-gray-800">
-                    ${order.total.toFixed(2)}
+                    {fmt(order.total)}
                   </td>
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
                     {order.createdAt?.toDate().toLocaleTimeString([], {

@@ -14,6 +14,7 @@ import {
 import { db } from "@/lib/firebase";
 import { RestaurantSettings, MenuItem, MenuItemOptionGroup } from "@/types";
 import { useCart } from "@/contexts/CartContext";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import Navbar from "@/components/customer/Navbar";
 import {
   MapPin,
@@ -48,6 +49,7 @@ interface ModalProps {
   ) => void;
 }
 function FoodDetailModal({ item, onClose, onAdd }: ModalProps) {
+  const { fmt } = useCurrency();
   const [qty, setQty] = useState(1);
   const [selected, setSelected] = useState<Record<string, string | string[]>>(
     {},
@@ -137,7 +139,7 @@ function FoodDetailModal({ item, onClose, onAdd }: ModalProps) {
           <div className="flex items-start justify-between gap-2 mb-2">
             <h2 className="text-xl font-bold text-gray-800">{item.name}</h2>
             <span className="text-lg font-bold text-amber-600">
-              ${item.price.toFixed(2)}
+              {fmt(item.price)}
             </span>
           </div>
           {item.dietaryTags?.length > 0 && (
@@ -178,7 +180,7 @@ function FoodDetailModal({ item, onClose, onAdd }: ModalProps) {
                     {opt.name}
                     {opt.extraCost > 0 && (
                       <span className="text-xs ml-1 opacity-70">
-                        +${opt.extraCost.toFixed(2)}
+                        +{fmt(opt.extraCost)}
                       </span>
                     )}
                   </button>
@@ -213,7 +215,7 @@ function FoodDetailModal({ item, onClose, onAdd }: ModalProps) {
                     : "bg-amber-500 hover:bg-amber-600 text-white"
               }`}
             >
-              {added ? "✓ Added!" : `Add to Cart — $${total.toFixed(2)}`}
+              {added ? "✓ Added!" : `Add to Cart — ${fmt(total)}`}
             </button>
           </div>
           {requiredMissing > 0 && (
@@ -231,6 +233,7 @@ export default function HomePage() {
   const [settings, setSettings] = useState<RestaurantSettings | null>(null);
   const [popular, setPopular] = useState<MenuItem[]>([]);
   const { addItem, totalItems } = useCart();
+  const { fmt } = useCurrency();
   const [addedKeys, setAddedKeys] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<MenuItem | null>(null);
 
@@ -404,7 +407,7 @@ export default function HomePage() {
                       </div>
                       <div className="flex items-center justify-between mt-2">
                         <p className="font-bold text-amber-600 text-sm">
-                          ${item.price.toFixed(2)}
+                          {fmt(item.price)}
                         </p>
                         {item.optionGroups?.length > 0 ? (
                           <button

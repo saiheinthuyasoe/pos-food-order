@@ -18,6 +18,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { Order, OrderStatus, RestaurantSettings } from "@/types";
 import { ArrowLeft, CheckCircle, Clock, Printer } from "lucide-react";
 import { STATUS_COLORS } from "../page";
@@ -43,6 +44,7 @@ const ACTION_LABELS: Partial<Record<OrderStatus, string>> = {
 
 export default function OrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>();
+  const { fmt } = useCurrency();
   const [order, setOrder] = useState<Order | null>(null);
   const [settings, setSettings] = useState<RestaurantSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -243,7 +245,7 @@ export default function OrderDetailPage() {
                       x{item.quantity}
                     </td>
                     <td className="px-5 py-3 text-right font-medium text-gray-800">
-                      ${item.lineTotal.toFixed(2)}
+                      {fmt(item.lineTotal)}
                     </td>
                   </tr>
                 ))}
@@ -252,33 +254,42 @@ export default function OrderDetailPage() {
             <div className="px-5 py-4 border-t border-gray-100 space-y-1 text-sm">
               <div className="flex justify-between text-gray-500">
                 <span>Subtotal</span>
-                <span>${order.subtotal.toFixed(2)}</span>
+                <span>{fmt(order.subtotal)}</span>
               </div>
               {order.discount > 0 && (
                 <div className="flex justify-between text-green-600">
                   <span>
                     Discount {order.promoCode && `(${order.promoCode})`}
                   </span>
-                  <span>-${order.discount.toFixed(2)}</span>
+                  <span>-{fmt(order.discount)}</span>
                 </div>
               )}
               {order.deliveryFee > 0 && (
                 <div className="flex justify-between text-gray-500">
                   <span>Delivery Fee</span>
-                  <span>${order.deliveryFee.toFixed(2)}</span>
+                  <span>{fmt(order.deliveryFee)}</span>
                 </div>
               )}
               <div className="flex justify-between text-gray-500">
                 <span>Tax</span>
-                {order.orderType === "walkin" && order.paymentStatus !== "paid" ? (
-                  <span className="text-xs italic text-gray-400">calculated at cashier</span>
+                {order.orderType === "walkin" &&
+                order.paymentStatus !== "paid" ? (
+                  <span className="text-xs italic text-gray-400">
+                    calculated at cashier
+                  </span>
                 ) : (
-                  <span>${order.tax.toFixed(2)}</span>
+                  <span>{fmt(order.tax)}</span>
                 )}
               </div>
               <div className="flex justify-between font-bold text-gray-800 pt-1 border-t border-gray-100">
-                <span>Total{order.orderType === "walkin" && order.paymentStatus !== "paid" ? " (before tax)" : ""}</span>
-                <span>${order.total.toFixed(2)}</span>
+                <span>
+                  Total
+                  {order.orderType === "walkin" &&
+                  order.paymentStatus !== "paid"
+                    ? " (before tax)"
+                    : ""}
+                </span>
+                <span>{fmt(order.total)}</span>
               </div>
             </div>
           </div>

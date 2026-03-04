@@ -13,6 +13,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { PromoCode } from "@/types";
 import { Plus, Trash2, X } from "lucide-react";
 
@@ -27,6 +28,7 @@ const EMPTY_FORM = {
 };
 
 export default function PromoCodesPage() {
+  const { fmt } = useCurrency();
   const [promos, setPromos] = useState<PromoCode[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -124,10 +126,10 @@ export default function PromoCodesPage() {
                   <td className="px-4 py-3 text-gray-800">
                     {p.discountType === "percentage"
                       ? `${p.discountAmount}%`
-                      : `$${p.discountAmount}`}
+                      : `${fmt(p.discountAmount)}`}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
-                    ${p.minOrderValue}
+                    {fmt(p.minOrderValue)}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {p.usageCount} {p.usageLimit ? `/ ${p.usageLimit}` : "/ ∞"}
@@ -152,7 +154,10 @@ export default function PromoCodesPage() {
                     </button>
                   </td>
                   <td className="px-4 py-3">
-                    <button onClick={() => remove(p.id)}>
+                    <button
+                      title="Delete Promo Code"
+                      onClick={() => remove(p.id)}
+                    >
                       <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-500" />
                     </button>
                   </td>
@@ -171,7 +176,7 @@ export default function PromoCodesPage() {
               <h2 className="text-lg font-semibold text-gray-800">
                 New Promo Code
               </h2>
-              <button onClick={close}>
+              <button title="Close Modal" onClick={close}>
                 <X className="w-5 h-5 text-gray-400" />
               </button>
             </div>
@@ -186,6 +191,7 @@ export default function PromoCodesPage() {
               </Field>
               <Field label="Discount Type">
                 <select
+                  title="Discount Type"
                   value={form.discountType}
                   onChange={(e) =>
                     setForm({
@@ -207,6 +213,7 @@ export default function PromoCodesPage() {
                 }
               >
                 <input
+                  title="Discount Amount"
                   type="number"
                   min={0}
                   value={form.discountAmount}
@@ -218,6 +225,7 @@ export default function PromoCodesPage() {
               </Field>
               <Field label="Min Order Value ($)">
                 <input
+                  title="Minimum Order Value"
                   type="number"
                   min={0}
                   value={form.minOrderValue}
@@ -229,6 +237,7 @@ export default function PromoCodesPage() {
               </Field>
               <Field label="Usage Limit (0 = unlimited)">
                 <input
+                  title="Usage Limit"
                   type="number"
                   min={0}
                   value={form.usageLimit}
@@ -240,6 +249,7 @@ export default function PromoCodesPage() {
               </Field>
               <Field label="Expiry Date">
                 <input
+                  title="Expiry Date"
                   type="date"
                   value={form.expiryDate}
                   onChange={(e) =>

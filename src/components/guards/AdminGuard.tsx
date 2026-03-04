@@ -7,7 +7,12 @@ import { useAuth } from "@/contexts/AuthContext";
 // Routes accessible per role (prefix matching)
 const ROLE_ALLOWED_PREFIXES: Record<string, string[]> = {
   kitchen: ["/admin/dashboard", "/admin/orders"],
-  delivery: ["/admin/dashboard", "/admin/orders", "/admin/delivery"],
+  delivery: [
+    "/admin/dashboard",
+    "/admin/orders",
+    "/admin/delivery",
+    "/admin/cashier",
+  ],
   cashier: ["/admin/cashier", "/admin/orders"],
 };
 
