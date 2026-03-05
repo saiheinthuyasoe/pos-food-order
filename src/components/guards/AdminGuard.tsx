@@ -60,8 +60,13 @@ export default function AdminGuard({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-gray-400 text-sm">Loading…</div>
+      <div
+        className="min-h-screen bg-gray-900 flex items-center justify-center"
+        suppressHydrationWarning
+      >
+        <div className="text-gray-400 text-sm" suppressHydrationWarning>
+          Loading…
+        </div>
       </div>
     );
   }

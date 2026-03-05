@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
+import { RestaurantProvider } from "@/contexts/RestaurantContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,9 +33,11 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <CurrencyProvider>
-          <AuthProvider>
-            <CartProvider>{children}</CartProvider>
-          </AuthProvider>
+          <RestaurantProvider>
+            <AuthProvider>
+              <CartProvider>{children}</CartProvider>
+            </AuthProvider>
+          </RestaurantProvider>
         </CurrencyProvider>
       </body>
     </html>

@@ -531,7 +531,54 @@ export default function CashierPage() {
             Collected Today
           </h2>
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
+            {/* Mobile cards */}
+            <div className="md:hidden divide-y divide-gray-100">
+              {paidToday.map((o) => (
+                <div
+                  key={o.id}
+                  className="p-4 flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="font-mono text-xs font-semibold text-amber-600">
+                        #{o.id.slice(-6).toUpperCase()}
+                      </span>
+                      <span className="text-xs text-gray-400 capitalize">
+                        {o.paymentMethod === "scan"
+                          ? "Scan QR"
+                          : o.paymentMethod}
+                      </span>
+                    </div>
+                    <p className="text-sm font-semibold text-gray-800 truncate">
+                      {o.customerName}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {o.tableNumber ? `Table ${o.tableNumber}` : "—"} ·{" "}
+                      {(o.paidAt as Timestamp | undefined)
+                        ?.toDate()
+                        .toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }) ?? "—"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-sm font-bold text-green-700">
+                      {fmt(o.total)}
+                    </span>
+                    <button
+                      onClick={() => handlePrint([o])}
+                      title="Print Receipt"
+                      className="text-gray-400 hover:text-gray-700"
+                    >
+                      <Printer className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Desktop table */}
+            <table className="hidden md:table w-full text-sm">
               <thead className="border-b border-gray-100">
                 <tr>
                   {[
@@ -605,7 +652,56 @@ export default function CashierPage() {
             Collected Today
           </h2>
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
+            {/* Mobile cards */}
+            <div className="md:hidden divide-y divide-gray-100">
+              {paidDeliveryToday.map((o) => (
+                <div
+                  key={o.id}
+                  className="p-4 flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="font-mono text-xs font-semibold text-blue-600">
+                        #{o.id.slice(-6).toUpperCase()}
+                      </span>
+                      <span className="text-xs text-gray-400 capitalize">
+                        {o.paymentMethod === "scan"
+                          ? "Scan QR"
+                          : o.paymentMethod}
+                      </span>
+                    </div>
+                    <p className="text-sm font-semibold text-gray-800 truncate">
+                      {o.customerName}
+                    </p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {o.deliveryAddress ?? "—"}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {(o.paidAt as Timestamp | undefined)
+                        ?.toDate()
+                        .toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }) ?? "—"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-sm font-bold text-green-700">
+                      {fmt(o.total)}
+                    </span>
+                    <button
+                      onClick={() => handlePrint([o])}
+                      title="Print Receipt"
+                      className="text-gray-400 hover:text-gray-700"
+                    >
+                      <Printer className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Desktop table */}
+            <table className="hidden md:table w-full text-sm">
               <thead className="border-b border-gray-100">
                 <tr>
                   {[

@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
+import { useRestaurant } from "@/contexts/RestaurantContext";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,6 +22,7 @@ import {
 export default function Navbar() {
   const { user, signOut } = useAuth();
   const { totalItems } = useCart();
+  const { name, logoUrl, loaded } = useRestaurant();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -31,6 +34,7 @@ export default function Navbar() {
   // Real-time unread notification count
   useEffect(() => {
     if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUnreadCount(0);
       return;
     }
@@ -58,6 +62,7 @@ export default function Navbar() {
 
   // Close mobile menu on route change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMobileOpen(false);
   }, [pathname]);
 
@@ -81,8 +86,31 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-2xl">🍔</span>
-            <span className="text-lg font-bold text-amber-600">FoodOrder</span>
+            {!loaded ? (
+              // Skeleton — prevents flash of old hardcoded UI
+              <>
+                <div className="w-8 h-8 rounded-lg bg-gray-100 animate-pulse" />
+                <div className="w-24 h-5 rounded bg-gray-100 animate-pulse" />
+              </>
+            ) : (
+              <>
+                {logoUrl ? (
+                  <Image
+                    src={logoUrl}
+                    alt="Logo"
+                    width={32}
+                    height={32}
+                    className="w-8 h-8 rounded-lg object-cover"
+                    unoptimized
+                  />
+                ) : (
+                  <span className="text-2xl">🍔</span>
+                )}
+                <span className="text-lg font-bold text-amber-600">
+                  {name || "FoodOrder"}
+                </span>
+              </>
+            )}
           </Link>
 
           {/* Desktop nav links */}

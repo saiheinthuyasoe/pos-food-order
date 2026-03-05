@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRestaurant } from "@/contexts/RestaurantContext";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -63,23 +65,21 @@ const NAV_ITEMS: NavItem[] = [
     icon: Tag,
     roles: ["super_admin"],
   },
-  
-  
+
   {
     href: "/admin/cashier",
     label: "Cashier",
     icon: Wallet,
     roles: ["super_admin", "cashier", "delivery"],
   },
-  
-  
+
   {
     href: "/admin/payments",
     label: "Payments",
     icon: CreditCard,
     roles: ["super_admin"],
   },
-  
+
   {
     href: "/admin/expenses",
     label: "Expenses",
@@ -110,7 +110,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: Users,
     roles: ["super_admin"],
   },
-  
+
   {
     href: "/admin/customers",
     label: "Customers",
@@ -134,15 +134,27 @@ const NAV_ITEMS: NavItem[] = [
 export default function AdminSidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
   const { user, adminRole, signOut } = useAuth();
+  const { name, logoUrl } = useRestaurant();
 
   return (
     <aside className="w-60 flex-shrink-0 bg-gray-900 flex flex-col h-full">
       {/* Logo */}
       <div className="px-5 py-5 border-b border-gray-700 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">🍽️</span>
-          <span className="text-white font-bold text-lg leading-tight">
-            FoodOrder
+        <div className="flex items-center gap-2 min-w-0">
+          {logoUrl ? (
+            <Image
+              src={logoUrl}
+              alt="Logo"
+              width={32}
+              height={32}
+              className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
+              unoptimized
+            />
+          ) : (
+            <span className="text-2xl flex-shrink-0">🍽️</span>
+          )}
+          <span className="text-white font-bold text-lg leading-tight truncate">
+            {name || "FoodOrder"}
             <br />
             <span className="text-xs font-normal text-gray-400">
               Admin Panel

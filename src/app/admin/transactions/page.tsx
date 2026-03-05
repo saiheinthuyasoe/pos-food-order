@@ -195,6 +195,7 @@ export default function TransactionsPage() {
   }, [range, customFrom, customTo]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 

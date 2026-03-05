@@ -167,11 +167,11 @@ export default function OrdersPage() {
       : orders.filter((o) => o.status === status).length;
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <h1 className="text-2xl font-bold text-gray-800 mb-5">Orders</h1>
 
       {/* Tabs */}
-      <div className="flex gap-1 overflow-x-auto mb-5 bg-white rounded-xl shadow-sm p-1 w-fit">
+      <div className="flex gap-1 overflow-x-auto mb-5 bg-white rounded-xl shadow-sm p-1">
         {TABS.map((t) => (
           <button
             key={t.value}
@@ -202,85 +202,145 @@ export default function OrdersPage() {
             No orders in this category.
           </p>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-100">
-              <tr>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">
-                  Order
-                </th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">
-                  Customer
-                </th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">
-                  Type
-                </th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">
-                  Items
-                </th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">
-                  Total
-                </th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">
-                  Time
-                </th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">
-                  Status
-                </th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            {/* ── Mobile card list ── */}
+            <div className="md:hidden divide-y divide-gray-100">
               {paginated.map((order) => (
-                <tr
+                <Link
                   key={order.id}
-                  className="border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors"
+                  href={`/admin/orders/${order.id}`}
+                  className="block p-4 hover:bg-gray-50 transition-colors"
                 >
-                  <td className="px-4 py-3 font-mono text-xs text-gray-600">
-                    #{order.id.slice(-6).toUpperCase()}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-gray-800">
-                    {order.customerName}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${order.orderType === "walkin" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}
-                    >
-                      {order.orderType === "walkin" ? "Walk-in" : "Delivery"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 max-w-48 truncate">
-                    {order.items
-                      .map((i) => `${i.name} x${i.quantity}`)
-                      .join(", ")}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-gray-800">
-                    {fmt(order.total)}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                    {order.createdAt?.toDate().toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </td>
-                  <td className="px-4 py-3">
+                  {/* Row 1: # · Type · Status */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-semibold text-gray-500">
+                        #{order.id.slice(-6).toUpperCase()}
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          order.orderType === "walkin"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-blue-100 text-blue-700"
+                        }`}
+                      >
+                        {order.orderType === "walkin" ? "Walk-in" : "Delivery"}
+                      </span>
+                    </div>
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[order.status] ?? "bg-gray-100 text-gray-600"}`}
                     >
                       {order.status.replace("_", " ")}
                     </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/admin/orders/${order.id}`}
-                      className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700 font-medium"
-                    >
-                      <Eye className="w-3.5 h-3.5" /> View
-                    </Link>
-                  </td>
-                </tr>
+                  </div>
+                  {/* Row 2: Customer + time */}
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-gray-800">
+                      {order.customerName}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {order.createdAt
+                        ?.toDate()
+                        .toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                    </p>
+                  </div>
+                  {/* Row 3: Items */}
+                  <p className="text-xs text-gray-400 mt-0.5 truncate">
+                    {order.items
+                      .map((i) => `${i.name} x${i.quantity}`)
+                      .join(", ")}
+                  </p>
+                  {/* Row 4: Total */}
+                  <p className="text-sm font-bold text-gray-800 mt-1.5">
+                    {fmt(order.total)}
+                  </p>
+                </Link>
               ))}
-            </tbody>
-          </table>
+            </div>
+            {/* ── Desktop table ── */}
+            <table className="hidden md:table w-full text-sm">
+              <thead className="border-b border-gray-100">
+                <tr>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">
+                    Order
+                  </th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">
+                    Customer
+                  </th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">
+                    Type
+                  </th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">
+                    Items
+                  </th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">
+                    Total
+                  </th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">
+                    Time
+                  </th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">
+                    Status
+                  </th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {paginated.map((order) => (
+                  <tr
+                    key={order.id}
+                    className="border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors"
+                  >
+                    <td className="px-4 py-3 font-mono text-xs text-gray-600">
+                      #{order.id.slice(-6).toUpperCase()}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-gray-800">
+                      {order.customerName}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${order.orderType === "walkin" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}
+                      >
+                        {order.orderType === "walkin" ? "Walk-in" : "Delivery"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 max-w-48 truncate">
+                      {order.items
+                        .map((i) => `${i.name} x${i.quantity}`)
+                        .join(", ")}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-gray-800">
+                      {fmt(order.total)}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                      {order.createdAt?.toDate().toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[order.status] ?? "bg-gray-100 text-gray-600"}`}
+                      >
+                        {order.status.replace("_", " ")}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/admin/orders/${order.id}`}
+                        className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700 font-medium"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> View
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
         )}
 
         {/* Pagination footer */}

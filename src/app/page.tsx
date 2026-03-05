@@ -15,6 +15,7 @@ import { db } from "@/lib/firebase";
 import { RestaurantSettings, MenuItem, MenuItemOptionGroup } from "@/types";
 import { useCart } from "@/contexts/CartContext";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useRestaurant } from "@/contexts/RestaurantContext";
 import Navbar from "@/components/customer/Navbar";
 import {
   MapPin,
@@ -129,6 +130,7 @@ function FoodDetailModal({ item, onClose, onAdd }: ModalProps) {
             )}
           </div>
           <button
+            title="Close"
             onClick={onClose}
             className="absolute top-3 right-3 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center shadow"
           >
@@ -191,6 +193,7 @@ function FoodDetailModal({ item, onClose, onAdd }: ModalProps) {
           <div className="flex items-center gap-4 mt-4">
             <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
               <button
+                title="Decrease Quantity"
                 onClick={() => setQty(Math.max(1, qty - 1))}
                 className="px-3 py-2 hover:bg-gray-50"
               >
@@ -198,6 +201,7 @@ function FoodDetailModal({ item, onClose, onAdd }: ModalProps) {
               </button>
               <span className="px-4 font-semibold">{qty}</span>
               <button
+                title="Increase Quantity"
                 onClick={() => setQty(qty + 1)}
                 className="px-3 py-2 hover:bg-gray-50"
               >
@@ -234,6 +238,7 @@ export default function HomePage() {
   const [popular, setPopular] = useState<MenuItem[]>([]);
   const { addItem, totalItems } = useCart();
   const { fmt } = useCurrency();
+  const { name: restaurantName, loaded: restaurantLoaded } = useRestaurant();
   const [addedKeys, setAddedKeys] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<MenuItem | null>(null);
 
@@ -330,7 +335,11 @@ export default function HomePage() {
                 </span>
               </div>
               <h1 className="text-4xl md:text-6xl font-extrabold leading-tight mb-4">
-                {settings?.name ?? "Fresh & Delicious"}
+                {!restaurantLoaded ? (
+                  <div className="w-64 h-12 md:h-16 rounded-xl bg-white/20 animate-pulse" />
+                ) : (
+                  restaurantName || "Fresh & Delicious"
+                )}
               </h1>
               <p className="text-lg opacity-90 mb-8">
                 Order your favourite dishes online for walk-in or delivery.

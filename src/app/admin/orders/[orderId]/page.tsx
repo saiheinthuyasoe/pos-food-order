@@ -147,23 +147,23 @@ export default function OrderDetailPage() {
   const nextLabel = nextStatus ? ACTION_LABELS[nextStatus] : null;
 
   return (
-    <div className="p-6 max-w-4xl">
-      <div className="flex items-center gap-4 mb-6">
+    <div className="p-4 sm:p-6 max-w-4xl">
+      <div className="flex flex-wrap items-start gap-3 mb-6">
         <Link
           href="/admin/orders"
           className="text-gray-400 hover:text-gray-700"
         >
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
             Order #{orderId.slice(-6).toUpperCase()}
           </h1>
           <p className="text-sm text-gray-500">
             {order.createdAt?.toDate().toLocaleString()}
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Print button — walk-in once confirmed; delivery+cash at any active stage */}
           {(order.orderType === "walkin" ||
             (order.orderType === "delivery" &&
@@ -298,7 +298,7 @@ export default function OrderDetailPage() {
 
           {/* Actions */}
           {!["delivered", "cancelled"].includes(order.status) && (
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               {nextLabel && (
                 <button
                   onClick={() => nextStatus && advanceStatus(nextStatus)}

@@ -167,6 +167,7 @@ export default function MenuItemForm({ categories, initial, itemId }: Props) {
     <form onSubmit={handleSubmit} className="p-6 max-w-2xl space-y-6">
       <div className="flex items-center gap-4">
         <button
+          title="Button"
           type="button"
           onClick={() => router.back()}
           className="text-gray-400 hover:text-gray-700"
@@ -194,6 +195,7 @@ export default function MenuItemForm({ categories, initial, itemId }: Props) {
           <div>
             <label className="label">Category</label>
             <select
+              title="Category"
               required
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
@@ -225,6 +227,7 @@ export default function MenuItemForm({ categories, initial, itemId }: Props) {
         <div>
           <label className="label">Base Price ($)</label>
           <input
+            title="number"
             type="number"
             min={0}
             step={0.01}
@@ -256,6 +259,7 @@ export default function MenuItemForm({ categories, initial, itemId }: Props) {
               {imagePreview ? "Change photo" : "Upload photo"}
             </button>
             <input
+              title="Image File"
               ref={fileRef}
               type="file"
               accept="image/*"
@@ -313,7 +317,7 @@ export default function MenuItemForm({ categories, initial, itemId }: Props) {
         </div>
         {optionGroups.length === 0 && (
           <p className="text-sm text-gray-400">
-            No option groups. Click "Add Group" to create one.
+            No option groups. Click &quot;Add Group&quot; to create one.
           </p>
         )}
         {optionGroups.map((group, gi) => (
@@ -349,6 +353,7 @@ export default function MenuItemForm({ categories, initial, itemId }: Props) {
                 Multiple
               </label>
               <button
+                title="Button"
                 type="button"
                 onClick={() => removeGroup(gi)}
                 className="text-gray-400 hover:text-red-500"
@@ -366,6 +371,7 @@ export default function MenuItemForm({ categories, initial, itemId }: Props) {
                 />
                 <span className="text-gray-400 text-sm">+$</span>
                 <input
+                  title="Extra Cost"
                   type="number"
                   min={0}
                   step={0.01}
@@ -376,6 +382,7 @@ export default function MenuItemForm({ categories, initial, itemId }: Props) {
                   className="w-20 rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
                 />
                 <button
+                  title="Button"
                   type="button"
                   onClick={() => removeOption(gi, oi)}
                   className="text-gray-300 hover:text-red-500"

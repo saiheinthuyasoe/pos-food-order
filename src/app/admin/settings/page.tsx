@@ -87,6 +87,34 @@ export default function SettingsPage() {
   const [qrUploading, setQrUploading] = useState(false);
   const [qrError, setQrError] = useState("");
   const qrInputRef = useRef<HTMLInputElement>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState("");
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoUploading(true);
+    setLogoError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload/logo", { method: "POST", body: fd });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? `Upload failed (${res.status})`);
+      }
+      // Add cache-buster so the browser doesn't show stale image
+      const { url } = await res.json();
+      update("logoUrl", url + "?t=" + Date.now());
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      setLogoError(msg);
+    } finally {
+      setLogoUploading(false);
+    }
+  };
 
   const handleQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -180,6 +208,59 @@ export default function SettingsPage() {
             required
           />
         </Field>
+
+        {/* Logo upload */}
+        <Field label="Restaurant Logo">
+          <div className="flex items-center gap-4">
+            {settings.logoUrl ? (
+              <div className="relative group">
+                <img
+                  src={settings.logoUrl}
+                  alt="Restaurant logo"
+                  className="w-16 h-16 rounded-xl object-cover border border-gray-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => update("logoUrl", "")}
+                  className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Remove logo"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <div className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300">
+                <span className="text-2xl">🍽️</span>
+              </div>
+            )}
+            <div>
+              <input
+                title="Logo File"
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleLogoUpload}
+              />
+              <button
+                type="button"
+                disabled={logoUploading}
+                onClick={() => logoInputRef.current?.click()}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-60"
+              >
+                <Upload className="w-4 h-4" />
+                {logoUploading ? "Uploading…" : "Upload Logo"}
+              </button>
+              {logoError && (
+                <p className="mt-1 text-xs text-red-500">{logoError}</p>
+              )}
+              <p className="mt-1 text-xs text-gray-400">
+                PNG or JPG, shown in sidebar &amp; customer navbar
+              </p>
+            </div>
+          </div>
+        </Field>
+
         <Field label="Address">
           <input
             value={settings.address}

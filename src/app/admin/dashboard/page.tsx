@@ -80,8 +80,8 @@ export default function AdminDashboardPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
+    <div className="p-4 sm:p-6 space-y-6">
+      <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Dashboard</h1>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
