@@ -164,8 +164,10 @@ export default function OrderDetailPage() {
           </p>
         </div>
         <div className="ml-auto flex items-center gap-3">
-          {/* Print button — available once order is confirmed or beyond */}
-          {order.orderType === "walkin" &&
+          {/* Print button — walk-in once confirmed; delivery+cash at any active stage */}
+          {(order.orderType === "walkin" ||
+            (order.orderType === "delivery" &&
+              order.paymentMethod === "cash")) &&
             !["pending", "cancelled"].includes(order.status) && (
               <button
                 onClick={handlePrint}

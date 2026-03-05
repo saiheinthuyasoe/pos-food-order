@@ -164,6 +164,7 @@ export function printReceipt(
   <div class="meta-line em">${order.orderType === "walkin" ? `TABLE ${order.tableNumber ?? "\u2014"}` : "DELIVERY"}</div>
   <div class="meta-line">${esc(order.customerName)}</div>
   ${order.customerPhone ? `<div class="meta-line">Tel: ${esc(order.customerPhone)}</div>` : ""}
+  ${order.orderType === "delivery" && order.deliveryAddress ? `<div class="meta-line">Addr: ${esc(order.deliveryAddress)}</div>` : ""}
 </div>
 
 <hr/>
